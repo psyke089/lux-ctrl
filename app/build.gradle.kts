@@ -1,6 +1,6 @@
 plugins { id("com.android.application") }
 
-val appVersionName = "0.1.3"
+val appVersionName = "0.2.0"
 
 android {
     namespace = "app.luxctrl"
@@ -9,7 +9,7 @@ android {
         applicationId = "app.luxctrl"
         minSdk = 24
         targetSdk = 37
-        versionCode = 4
+        versionCode = 5
         versionName = appVersionName
         testInstrumentationRunner = "app.luxctrl.BridgeSmokeInstrumentation"
     }
