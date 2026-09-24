@@ -69,6 +69,20 @@ class ColorDiscView(context: Context) : View(context) {
         paint.shader = ringShader
         canvas.drawCircle(cx,cy,radius*.86f,paint)
         paint.shader = null
+        // Concentric etched scales match the reactor dial without changing its hit regions.
+        val dp=resources.displayMetrics.density
+        paint.style=Paint.Style.STROKE; paint.strokeWidth=dp*.7f
+        paint.color=Design.alpha(Design.teal,140)
+        canvas.drawCircle(cx,cy,radius+3*dp,paint)
+        paint.color=Design.alpha(Design.violet,150)
+        canvas.drawCircle(cx,cy,discRadius+4*dp,paint)
+        for(tick in 0 until 60) {
+            val a=tick*PI/30
+            val r1=radius+6*dp; val r2=r1+(if(tick%5==0) 4f else 1.5f)*dp
+            paint.color=Design.alpha(Design.teal,if(tick%5==0) 160 else 65)
+            canvas.drawLine(cx+cos(a).toFloat()*r1,cy+sin(a).toFloat()*r1,
+                cx+cos(a).toFloat()*r2,cy+sin(a).toFloat()*r2,paint)
+        }
         bitmap?.let { b ->
             if (bitmapHue != hue) {
                 val hsv = floatArrayOf(hue,1f,1f)
@@ -82,7 +96,7 @@ class ColorDiscView(context: Context) : View(context) {
             canvas.save()
             clip.reset(); clip.addCircle(cx,cy,discRadius,Path.Direction.CW)
             canvas.clipPath(clip)
-            paint.style = Paint.Style.FILL
+            paint.style = Paint.Style.FILL; paint.color = Color.WHITE
             discBounds.set(cx-discRadius,cy-discRadius,cx+discRadius,cy+discRadius)
             canvas.drawBitmap(b,null,discBounds,paint)
             canvas.restore()

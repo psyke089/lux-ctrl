@@ -13,3 +13,14 @@ Tested on 24 September 2026 with the connected OnePlus 5T (Android 13 / API 33) 
 - No third-party runtime network/UI dependencies. Endpoint validation restricts requests to a configured private IPv4 bridge, rejects redirects, and never uses cloud discovery.
 
 API 24 and API 37 runtime behavior has not been tested on devices or emulators. API 24 compatibility is checked by the build and lint; the API 37 local-network permission path is implemented but untested on hardware. HTTPS-only modern bridges are outside this version’s supported connection mode.
+
+
+## Neon console makeover — 24 September 2026
+
+- Branch: `design/neon-reactor`. All graphics are procedural Android Canvas/shader artwork; no downloaded assets or new runtime dependencies. The header, lamp dial, three-column scene grid and dialog controls retain their existing arrangement.
+- Debug and optimized release builds, all 12 unit tests and Android lint pass (`No issues found`). The optimized APK installs and runs on the OnePlus 5T / API 33.
+- Screen captures and UI hierarchy bounds confirm all 12 scene buttons fit entirely inside the scene viewport without scrolling at 1080 × 2160 and a temporary 960 × 1706 screen size, in portrait and landscape. Compact rows adapt to available height; additional scenes can still scroll.
+- The lamp dialog opens and closes with the new glass border and etched color-disc scale. Updated screenshots are from the running app.
+- Static dial artwork is cached between state changes; gestures and scene transitions draw directly. In a roughly 24-second on-device animation sample (730 frames), median frame time was 7 ms, 95th percentile 10 ms, and 3 frames (0.41%) missed their deadline. These are device-specific measurements, not a performance guarantee.
+- Decorative animation is capped near 30 fps, respects the system animator setting and is cancelled when hidden, detached or unfocused. Bitmap resources are released on detach and resize. Reduced-motion handling was reviewed in code, not toggled on hardware.
+- A rotation reset caused a UI test tap to activate the existing “Konzentrieren” scene. No scenes were created, edited or deleted. Remaining dialog checks made no lamp changes. Original display size and rotation preferences were restored.

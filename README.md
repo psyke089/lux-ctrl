@@ -8,7 +8,7 @@
 </p>
 <p align="center"><img src="docs/screenshot-portrait.png" alt="Lux Ctrl on a phone: six radial lamp controls above colorful Hue scene buttons" width="300"></p>
 
-A small, dark Android app for Philips Hue, built from [SPEC.md](docs/SPEC.md) with Kotlin and native Android views. No accounts, cloud calls, analytics, ads, or third-party runtime libraries. All icons and graphics are drawn in the project; the badges are rendered by shields.io.
+A small, dark Android app for Philips Hue, built from [SPEC.md](docs/SPEC.md) with Kotlin and native Android views. No accounts, cloud calls, analytics, ads, or third-party runtime libraries. All icons and graphics are drawn in the project; the badges are rendered by shields.io. The neon console theme uses procedural glass surfaces, spectrum cartridges, radial light shaders and animated reactor rings, with no downloaded artwork. Decorative motion follows Android’s animation setting and pauses when the app loses focus.
 
 ## Controls
 

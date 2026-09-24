@@ -6,7 +6,8 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
+import android.graphics.LinearGradient
+import android.graphics.Shader
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -29,6 +30,7 @@ class MainActivity : Activity() {
     private lateinit var sceneTag: TextView
     private lateinit var errorText: TextView
     private lateinit var sceneList: LinearLayout
+    private lateinit var sceneViewport: ScrollView
     private lateinit var saveGlyph: GlyphView
     private var sceneSignature = ""
     private var resumed = false
@@ -88,7 +90,7 @@ class MainActivity : Activity() {
     }
     private fun buildContent() {
         sceneSignature="!"
-        root=column().apply { setBackgroundColor(Design.bg) }
+        root=column().apply { background=ConsoleBackdrop(this@MainActivity) }
         if (Build.VERSION.SDK_INT >= 30) window.setDecorFitsSystemWindows(false)
         else {
             @Suppress("DEPRECATION")
@@ -107,7 +109,12 @@ class MainActivity : Activity() {
         val header=row().apply { setPadding(dp(22),dp(10),dp(18),dp(10)) }
         // Title, bridge status and active scene stack to the same height as the 48 dp buttons.
         val brand=column()
-        brand.addView(text("LUX//CTRL",20f,Design.ink).apply { typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL); letterSpacing=.13f })
+        brand.addView(text("LUX//CTRL",20f,Design.ink).apply {
+            typeface=Typeface.create("sans-serif-black",Typeface.ITALIC); letterSpacing=.13f
+            setShadowLayer(dp(8).toFloat(),0f,0f,Design.alpha(Design.teal,90))
+            paint.shader=LinearGradient(0f,0f,paint.measureText("LUX//CTRL"),0f,
+                intArrayOf(Design.ink,Design.teal,Design.violet),null,Shader.TileMode.CLAMP)
+        })
         brand.addView(space(1)); status=text("●  CONNECTING",9f,Design.teal,true); brand.addView(status)
         brand.addView(space(1))
         sceneTag=text("",9f,Design.muted,true).apply { maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END }
@@ -155,8 +162,27 @@ class MainActivity : Activity() {
     private fun scenesPanel(): LinearLayout {
         val box=column().apply { setPadding(dp(22),dp(0),dp(22),dp(4)) }
         sceneList=column()
-        box.addView(ScrollView(this).apply { isFillViewport=true; clipToPadding=false; addView(sceneList); isVerticalScrollBarEnabled=false },LinearLayout.LayoutParams(-1,0,1f))
+        sceneViewport=ScrollView(this).apply {
+            isFillViewport=true; clipToPadding=false; addView(sceneList); isVerticalScrollBarEnabled=false
+            addOnLayoutChangeListener { _,_,_,_,_,_,_,_,_ -> fitSceneRows() }
+        }
+        box.addView(sceneViewport,LinearLayout.LayoutParams(-1,0,1f))
         return box
+    }
+    /** Keep the original 3 × 4 grid within the viewport, including shorter landscape screens. */
+    private fun fitSceneRows() {
+        if(sceneViewport.height<=0 || session.state.scenes.isEmpty()) return
+        val cardHeight=minOf(dp(58),(sceneViewport.height/4-dp(4)).coerceAtLeast(dp(44)))
+        for(rowIndex in 0 until sceneList.childCount) {
+            val row=sceneList.getChildAt(rowIndex) as? LinearLayout ?: continue
+            for(i in 0 until row.childCount) {
+                val card=row.getChildAt(i)
+                if(card.layoutParams.height!=cardHeight) {
+                    card.layoutParams=card.layoutParams.apply { height=cardHeight }
+                    card.setPadding(dp(9),if(cardHeight<dp(50)) dp(3) else dp(6),dp(9),if(cardHeight<dp(50)) dp(3) else dp(6))
+                }
+            }
+        }
     }
     private fun render() {
         if (!::wheel.isInitialized || isDestroyed) return
@@ -195,6 +221,7 @@ class MainActivity : Activity() {
                 for(i in trio.size until 3) r.addView(View(this),LinearLayout.LayoutParams(0,dp(58),1f).apply { if(i<2) marginEnd=dp(7) })
                 sceneList.addView(r)
             }
+            fitSceneRows()
         }
         session.notice?.let { toast(it); session.notice=null }
     }
@@ -202,7 +229,7 @@ class MainActivity : Activity() {
         val selected=session.activeId==scene.id
         val box=column().apply {
             setPadding(dp(9),dp(6),dp(9),dp(6)); gravity=Gravity.CENTER_VERTICAL
-            Design.clickable(this,if(selected) 0xff193139.toInt() else Design.panel,if(selected) Design.teal else Design.line,12f)
+            Design.clickable(this,if(selected) 0xff102b38.toInt() else Design.panel,if(selected) Design.teal else Design.line,12f)
             isClickable=true; isFocusable=true
             contentDescription="${scene.name}${if(selected) ", selected" else ""}. Tap to activate; hold to rename or delete."
             setOnClickListener {
@@ -214,7 +241,7 @@ class MainActivity : Activity() {
         }
         val colors=scene.colors.ifEmpty { listOf(Design.muted,Design.line) }
         val rail=View(this).apply {
-            background=GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, (if(colors.size==1) colors+colors else colors).toIntArray()).apply { cornerRadius=dp(3).toFloat() }
+            background=SpectrumDrawable(this@MainActivity,colors)
             importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         box.addView(rail,LinearLayout.LayoutParams(-1,dp(18)))
@@ -225,7 +252,7 @@ class MainActivity : Activity() {
         return box
     }
     private fun toast(value: String) { Toast.makeText(this,value,Toast.LENGTH_SHORT).show() }
-    private fun show(value: AlertDialog) { dialog?.dismiss(); dialog=value; value.show(); value.window?.setBackgroundDrawable(Design.shape(this,Design.panel,Design.line,20f)) }
+    private fun show(value: AlertDialog) { dialog?.dismiss(); dialog=value; value.show(); value.window?.setBackgroundDrawable(NeonPanel(this,Design.panel,Design.line,20f)) }
     private fun dialogBody()=column().apply { setPadding(dp(24),dp(12),dp(24),dp(12)) }
     private fun settings() {
         val body=dialogBody()

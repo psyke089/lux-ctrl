@@ -9,19 +9,26 @@ import android.view.View
 import android.widget.TextView
 
 object Design {
-    val bg = Color.rgb(12,20,26)
-    val panel = Color.rgb(17,29,37)
-    val line = Color.rgb(37,57,68)
-    val ink = Color.rgb(226,238,242)
-    val muted = Color.rgb(136,160,173)
-    val teal = Color.rgb(82,224,209)
-    val amber = Color.rgb(238,175,113)
+    val bg = Color.rgb(5,8,19)
+    val panel = Color.rgb(12,19,37)
+    val line = Color.rgb(37,62,88)
+    val ink = Color.rgb(230,246,255)
+    val muted = Color.rgb(142,164,190)
+    val teal = Color.rgb(89,247,235)
+    val violet = Color.rgb(163,118,255)
+    val amber = Color.rgb(255,189,119)
+    fun alpha(color: Int, value: Int) = (color and 0x00ffffff) or (value.coerceIn(0,255) shl 24)
+    fun mix(a: Int, b: Int, t: Float): Int = Color.rgb(
+        (Color.red(a)+(Color.red(b)-Color.red(a))*t).toInt(),
+        (Color.green(a)+(Color.green(b)-Color.green(a))*t).toInt(),
+        (Color.blue(a)+(Color.blue(b)-Color.blue(a))*t).toInt())
     fun dp(c: Context, n: Float) = n * c.resources.displayMetrics.density
     fun shape(c: Context, fill: Int = panel, stroke: Int = line, radius: Float = 14f) = GradientDrawable().apply {
         setColor(fill); cornerRadius = dp(c,radius); setStroke(dp(c,1f).toInt(),stroke)
     }
     fun clickable(v: View, fill: Int = panel, stroke: Int = line, radius: Float = 14f) {
-        v.background = RippleDrawable(ColorStateList.valueOf(0x3052e0d1),shape(v.context,fill,stroke,radius),null)
+        v.background = RippleDrawable(ColorStateList.valueOf(alpha(teal,55)),
+            NeonPanel(v.context,fill,stroke,radius),shape(v.context,Color.WHITE,Color.WHITE,radius))
     }
     fun label(c: Context, value: String, size: Float = 12f, color: Int = muted, mono: Boolean = false) = TextView(c).apply {
         text = value; textSize = size; setTextColor(color)
@@ -42,13 +49,13 @@ class GlyphView @JvmOverloads constructor(context: Context, private val glyph: S
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val s = Design.dp(context,10f); val cx = width/2f; val cy = height/2f
-        p.color = Design.ink; p.strokeWidth = Design.dp(context,1.5f); p.style = Paint.Style.STROKE; p.strokeCap = Paint.Cap.ROUND
+        p.color = Design.teal; p.strokeWidth = Design.dp(context,1.5f); p.style = Paint.Style.STROKE; p.strokeCap = Paint.Cap.ROUND
         if (glyph == "settings") {
             for (i in -1..1) {
                 val y = cy + i*s*.65f; val x = cx + (if (i == 0) -.4f else .4f)*s
                 canvas.drawLine(cx-s,y,cx+s,y,p)
                 p.style = Paint.Style.FILL; p.color = Design.bg; canvas.drawCircle(x,y,s*.25f,p)
-                p.style = Paint.Style.STROKE; p.color = Design.ink; canvas.drawCircle(x,y,s*.25f,p)
+                p.style = Paint.Style.STROKE; p.color = Design.teal; canvas.drawCircle(x,y,s*.25f,p)
             }
         } else if (glyph == "close") {
             val e = s*.8f
