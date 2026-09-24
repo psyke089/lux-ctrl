@@ -11,7 +11,15 @@ import kotlin.math.*
 
 class LampWheel(context: Context) : View(context) {
     var lamps: List<Lamp> = emptyList()
-        set(value) { field = value; animateTo(value); updateDescription() }
+        private set
+    /** Scene changes glide between states; direct gestures (dimming a slice) snap. */
+    fun setLamps(value: List<Lamp>, animate: Boolean) {
+        lamps = value
+        // Once the request has settled, trust the bridge rather than the held gesture value.
+        if (interactive) holdIndex = -1
+        if (animate) animateTo(value) else { animator?.cancel(); display = value; invalidate() }
+        updateDescription()
+    }
     var ready = false
         set(value) { if (field != value) { field = value; invalidate() } }
     /** Touch input is off while a request is in flight, without flickering the hub. */
@@ -26,13 +34,17 @@ class LampWheel(context: Context) : View(context) {
     private var preview = 0
     private var downX = 0f; private var downY = 0f
     private var dragged = false; private var powerDown = false
+    // After a brightness swipe the released value stays on screen until the bridge confirms it,
+    // so the slice never flickers back to the old value and forward again.
+    private var holdIndex = -1
+    private var holdBrightness = 0
     private var display: List<Lamp> = emptyList()
     private var animator: ValueAnimator? = null
     private val argb = ArgbEvaluator()
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
     private val cx get() = width/2f
     private val cy get() = height/2f
-    private val outer get() = min(width,height)/2f - Design.dp(context,30f)
+    private val outer get() = min(width,height)/2f - Design.dp(context,20f)
     private val inner get() = outer*.36f
     init { isClickable = true; isFocusable = true; updateDescription() }
     private fun updateDescription() {
@@ -64,6 +76,9 @@ class LampWheel(context: Context) : View(context) {
         }
     }
 
+    /** Drop a held gesture value, e.g. when the change was never sent. */
+    fun clearHold() { if (holdIndex >= 0) { holdIndex = -1; invalidate() } }
+
     override fun onDraw(c: Canvas) {
         super.onDraw(c)
         val r = outer
@@ -88,7 +103,12 @@ class LampWheel(context: Context) : View(context) {
         if (count > 0) for ((index,lamp) in list.withIndex()) {
             val step = 360f/count; val gap = min(5f, step*.15f)
             val start = -90+index*step+gap/2; val sweep = step-gap
-            val bright = if (selected == index && dragged) preview else if (lamp.on) lamp.brightness else 0
+            val bright = when {
+                selected == index && dragged -> preview
+                index == holdIndex -> holdBrightness
+                lamp.on -> lamp.brightness
+                else -> 0
+            }
             val fillTo = inner+(r-inner)*bright/254f
             val a = (index*step-90)*PI/180
             paint.style = Paint.Style.STROKE; paint.color = Design.line; paint.strokeWidth = dp
@@ -111,7 +131,7 @@ class LampWheel(context: Context) : View(context) {
                 !lamp.reachable -> "—"
                 else -> lamp.name
             }
-            val labelR = r + 20*dp
+            val labelR = r + 16*dp
             val tx = cx+cos(mid).toFloat()*labelR
             val ty = cy+sin(mid).toFloat()*labelR + paint.textSize*.35f
             // Keep long names inside the view instead of clipping at the edges.
@@ -144,8 +164,10 @@ class LampWheel(context: Context) : View(context) {
                 powerDown = radius < inner
                 selected = if (powerDown) -1 else WheelMath.slice(e.x-cx,e.y-cy,lamps.size)
                 initialR = radius; downX=e.x; downY=e.y; dragged=false
-                startBrightness = lamps.getOrNull(selected)?.let { if (it.on) it.brightness else 0 } ?: 0
+                startBrightness = if (selected == holdIndex) holdBrightness
+                    else lamps.getOrNull(selected)?.let { if (it.on) it.brightness else 0 } ?: 0
                 preview = startBrightness
+                holdIndex = -1
                 parent.requestDisallowInterceptTouchEvent(true)
                 return true
             }
@@ -160,8 +182,10 @@ class LampWheel(context: Context) : View(context) {
             MotionEvent.ACTION_UP -> {
                 if (powerDown && !dragged && radius < inner) performClick()
                 else lamps.getOrNull(selected)?.let {
-                    if (dragged && it.dimmable && it.reachable && preview != startBrightness) onBrightness(it,preview)
-                    else if (!dragged) onLamp(it)
+                    if (dragged && it.dimmable && it.reachable && preview != startBrightness) {
+                        holdIndex = selected; holdBrightness = preview
+                        onBrightness(it,preview)
+                    } else if (!dragged) onLamp(it)
                 }
                 selected=-1; invalidate(); parent.requestDisallowInterceptTouchEvent(false)
                 return true

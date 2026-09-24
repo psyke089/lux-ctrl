@@ -34,6 +34,8 @@ class MainActivity : Activity() {
     private var resumed = false
     private var dialog: AlertDialog? = null
     private var intervalSeconds = 10
+    /** Set when a scene is activated so only that change glides; direct gestures snap. */
+    private var glideNextLamps = false
     private val intervalOptions = listOf(2,5,10,30,60)
     private val poll = object : Runnable {
         override fun run() {
@@ -125,7 +127,6 @@ class MainActivity : Activity() {
         val lamps=lampPanel(); val scenes=scenesPanel()
         if(landscape) {
             body.addView(scenes,LinearLayout.LayoutParams(0, -1, .47f))
-            body.addView(View(this).apply { setBackgroundColor(Design.line) },LinearLayout.LayoutParams(dp(1),-1))
             body.addView(lamps,LinearLayout.LayoutParams(0,-1,.53f))
         } else {
             body.addView(lamps,LinearLayout.LayoutParams(-1,0,.60f))
@@ -134,7 +135,7 @@ class MainActivity : Activity() {
         root.addView(body,LinearLayout.LayoutParams(-1,0,1f)); setContentView(root); root.requestApplyInsets(); render()
     }
     private fun lampPanel(): LinearLayout {
-        val box=column().apply { setPadding(dp(18),dp(6),dp(18),dp(12)) }
+        val box=column().apply { setPadding(dp(18),dp(6),dp(18),dp(2)) }
         // The section headline is gone; keep the active-scene status as a slim top-right tag.
         sceneTag=text("",10f,Design.muted,true).apply {
             maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END; gravity=Gravity.END
@@ -152,7 +153,7 @@ class MainActivity : Activity() {
         return box
     }
     private fun scenesPanel(): LinearLayout {
-        val box=column().apply { setPadding(dp(22),dp(4),dp(22),dp(4)) }
+        val box=column().apply { setPadding(dp(22),dp(0),dp(22),dp(4)) }
         sceneList=column()
         box.addView(ScrollView(this).apply { isFillViewport=true; clipToPadding=false; addView(sceneList); isVerticalScrollBarEnabled=false },LinearLayout.LayoutParams(-1,0,1f))
         return box
@@ -169,7 +170,10 @@ class MainActivity : Activity() {
         }
         status.setTextColor(if(session.online) Design.teal else Design.muted)
         errorText.text=session.error.orEmpty(); errorText.visibility=if(session.error!=null) View.VISIBLE else View.GONE
-        wheel.lamps=state.lamps; wheel.ready=session.online; wheel.interactive=session.online && !session.busy
+        wheel.ready=session.online; wheel.interactive=session.online && !session.busy
+        val glide=glideNextLamps && !session.busy
+        if(glide) glideNextLamps=false
+        wheel.setLamps(state.lamps,glide)
         val active=state.scenes.find { it.id==session.activeId }
         sceneTag.text=when {
             active==null -> if(state.lamps.isEmpty()) "" else "NO SCENE"
@@ -203,6 +207,7 @@ class MainActivity : Activity() {
             contentDescription="${scene.name}${if(selected) ", selected" else ""}. Tap to activate; hold to rename or delete."
             setOnClickListener {
                 if (!session.online || session.busy) return@setOnClickListener
+                glideNextLamps=true
                 session.change("${scene.name} activated") { api -> api.activate(scene.id); scene.id }
             }
             setOnLongClickListener { sceneOptions(scene); true }
@@ -264,7 +269,7 @@ class MainActivity : Activity() {
         }
     }
     private fun setBrightness(lamp: Lamp,bri: Int) {
-        if(session.busy || !session.online) return
+        if(session.busy || !session.online) { wheel.clearHold(); return }
         session.change("${lamp.name} · ${(bri/254f*100).roundToInt()}%",edit=true) { api ->
             val payload=JSONObject().put("on",bri>0)
             if(bri>0 && lamp.dimmable) payload.put("bri",bri.coerceIn(1,254))
