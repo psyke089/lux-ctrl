@@ -9,21 +9,21 @@
 </p>
 <p align="center"><img src="docs/screenshot-portrait.png" alt="Lux Ctrl on a phone: six radial lamp controls above colorful Hue scene buttons" width="300"></p>
 
-A small, dark Android app for Philips Hue, built from [SPEC.md](SPEC.md) with Kotlin and native Android views. No accounts, cloud calls, analytics, ads, or third-party runtime libraries. All icons, graphics, and badges are drawn in the project.
+A small, dark Android app for Philips Hue, built from [SPEC.md](docs/SPEC.md) with Kotlin and native Android views. No accounts, cloud calls, analytics, ads, or third-party runtime libraries. All icons, graphics, and badges are drawn in the project.
 
 ## Controls
 
-- **Light field:** each slice is a lamp. Drag outward to brighten, inward to dim; reaching zero turns it off. Release to send the change. Tap a slice or its named button for a color disc: the outer ring chooses hue; the inner disc blends saturation and brightness. White temperature remains available on supported lamps. Changes are sent only when you tap **Apply**.
+- **Light field:** each named slice is a lamp. Drag outward to brighten, inward to dim; reaching zero turns it off. Release to send the change. Tap a slice for a color disc: the outer ring chooses hue; the inner disc blends saturation and brightness. White temperature remains available on supported lamps. Edits apply as you make them. The heading shows the active scene.
 - **Power:** tap the center to switch all bridge lights off; when all are off, tap to turn them on.
-- **Scenes:** tap to activate; hold to rename or delete. Each palette comes from the scene’s stored lamp colors. Changes sync with the Hue bridge and other Hue apps.
-- **Save:** overwrites the selected scene’s included lamps with their current states. **+ New** clears the selection so Save asks for a new name and captures all lamps. Manual light edits retain the selected scene for overwriting.
-- **Landscape:** scenes move left and the light field moves right. Named controls open the same picker as their circle slices. The picker adapts to landscape, and supports keyboard and accessibility adjustments.
+- **Scenes:** a three-column grid. Tap to activate; hold to rename or delete. Each palette comes from the scene’s stored lamp colors. Changes sync with the Hue bridge and other Hue apps.
+- **Save:** opens a name dialog. With a scene active, the field is prefilled and saving overwrites that scene (renaming it if you change the name). With no scene active, saving creates a new scene from all lamps.
+- **Landscape:** scenes move left and the light field moves right. The color disc opens from any slice and adapts to landscape; it supports keyboard and accessibility adjustments.
 
 ## Connect
 
-Install the APK, open the settings icon, and enter your bridge’s private IPv4 address and API key. The phone must be on a network that can reach the bridge; internet access is unnecessary. Android 17+ requests [local-network permission](https://developer.android.com/privacy-and-security/local-network-permission).
+Install the APK, open the settings icon, and enter your bridge’s private IPv4 address and API key, and choose how often lamps refresh. The phone must be on a network that can reach the bridge; internet access is unnecessary. Android 17+ requests [local-network permission](https://developer.android.com/privacy-and-security/local-network-permission).
 
-Credentials stay in the app’s private storage, excluded from backups and device transfers. They are never bundled in the APK or committed. This version uses the **local Hue v1 HTTP API**, tested with a first-generation BSB001 bridge; HTTPS-only bridges are not supported. Use a trusted local network. Refresh reloads lamps and scenes; lamps also refresh every six seconds while the app is visible.
+Credentials stay in the app’s private storage, excluded from backups and device transfers. They are never bundled in the APK or committed. This version uses the **local Hue v1 HTTP API**, tested with a first-generation BSB001 bridge; HTTPS-only bridges are not supported. Use a trusted local network. Refresh reloads lamps and scenes; lamps also refresh at the interval chosen in settings (10 seconds by default) while the app is visible.
 
 ## Build
 

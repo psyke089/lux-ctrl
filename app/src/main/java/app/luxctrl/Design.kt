@@ -45,6 +45,9 @@ class GlyphView @JvmOverloads constructor(context: Context, private val glyph: S
                 p.style = Paint.Style.FILL; p.color = Design.bg; canvas.drawCircle(x,y,s*.25f,p)
                 p.style = Paint.Style.STROKE; p.color = Design.ink; canvas.drawCircle(x,y,s*.25f,p)
             }
+        } else if (glyph == "close") {
+            canvas.drawLine(cx-s*.7f,cy-s*.7f,cx+s*.7f,cy+s*.7f,p)
+            canvas.drawLine(cx+s*.7f,cy-s*.7f,cx-s*.7f,cy+s*.7f,p)
         } else {
             canvas.drawArc(cx-s,cy-s,cx+s,cy+s,35f,285f,false,p)
             canvas.drawLine(cx+s*.76f,cy-s*.67f,cx+s*.8f,cy-s*1.15f,p)

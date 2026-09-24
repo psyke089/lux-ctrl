@@ -24,6 +24,8 @@ class ColorDiscView(context: Context) : View(context) {
     private var tones = FloatArray(0)
     private var pixels = IntArray(0)
     private var bitmapHue = Float.NaN
+    private val clip = Path()
+    private val discBounds = RectF()
     private var pointer = MotionEvent.INVALID_POINTER_ID
     private var gesture = 0 // 1 = hue ring, 2 = inner disc; stays latched throughout a drag.
     private var focusedControl = 1
@@ -78,9 +80,11 @@ class ColorDiscView(context: Context) : View(context) {
                 bitmapHue = hue
             }
             canvas.save()
-            canvas.clipPath(Path().apply { addCircle(cx,cy,discRadius,Path.Direction.CW) })
+            clip.reset(); clip.addCircle(cx,cy,discRadius,Path.Direction.CW)
+            canvas.clipPath(clip)
             paint.style = Paint.Style.FILL
-            canvas.drawBitmap(b,null,RectF(cx-discRadius,cy-discRadius,cx+discRadius,cy+discRadius),paint)
+            discBounds.set(cx-discRadius,cy-discRadius,cx+discRadius,cy+discRadius)
+            canvas.drawBitmap(b,null,discBounds,paint)
             canvas.restore()
         }
         val angle = -hue*PI/180
