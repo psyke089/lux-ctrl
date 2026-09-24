@@ -29,7 +29,7 @@ class MainActivity : Activity() {
     private lateinit var sceneTag: TextView
     private lateinit var errorText: TextView
     private lateinit var sceneList: LinearLayout
-    private lateinit var save: TextView
+    private lateinit var saveGlyph: GlyphView
     private var sceneSignature = ""
     private var resumed = false
     private var dialog: AlertDialog? = null
@@ -47,11 +47,6 @@ class MainActivity : Activity() {
     private fun column() = LinearLayout(this).apply { orientation=LinearLayout.VERTICAL }
     private fun text(s: String,size: Float=12f,color: Int=Design.muted,mono: Boolean=false) = Design.label(this,s,size,color,mono)
     private fun space(height: Int) = View(this).apply { layoutParams=LinearLayout.LayoutParams(1,dp(height)) }
-    private fun action(s: String, onClick: () -> Unit): TextView = text(s,12f,Design.ink).apply {
-        gravity=Gravity.CENTER; minHeight=dp(48); setPadding(dp(14),0,dp(14),0)
-        isClickable=true; isFocusable=true; Design.clickable(this)
-        setOnClickListener { onClick() }
-    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val ip=prefs.getString("ip","").orEmpty(); val key=prefs.getString("key","").orEmpty()
@@ -114,6 +109,8 @@ class MainActivity : Activity() {
         header.addView(brand,LinearLayout.LayoutParams(0,dp(48),1f))
         val refresh=GlyphView(this,"refresh").apply { contentDescription="Refresh lights and scenes"; setOnClickListener { if(hasNetworkPermission()) session.refresh(true) else requestLocalNetwork() } }
         header.addView(refresh,LinearLayout.LayoutParams(dp(48),dp(48)).apply { marginEnd=dp(8) })
+        saveGlyph=GlyphView(this,"save").apply { setOnClickListener { saveScene() } }
+        header.addView(saveGlyph,LinearLayout.LayoutParams(dp(48),dp(48)).apply { marginEnd=dp(8) })
         val settings=GlyphView(this,"settings").apply { contentDescription="Bridge settings"; setOnClickListener { settings() } }
         header.addView(settings,LinearLayout.LayoutParams(dp(48),dp(48)))
         root.addView(header)
@@ -157,11 +154,8 @@ class MainActivity : Activity() {
     }
     private fun scenesPanel(): LinearLayout {
         val box=column().apply { setPadding(dp(22),dp(15),dp(22),dp(8)) }
-        val heading=row()
-        heading.addView(text("02  /  SCENES",10f,Design.muted,true),LinearLayout.LayoutParams(0,-2,1f))
-        save=action("Save") { saveScene() }.apply { Design.clickable(this,0xff173437.toInt(),0xff315f63.toInt(),12f); setTextColor(Design.teal) }
-        heading.addView(save,LinearLayout.LayoutParams(dp(66),dp(48)))
-        box.addView(heading); box.addView(space(12))
+        box.addView(text("02  /  SCENES",10f,Design.muted,true))
+        box.addView(space(12))
         sceneList=column()
         box.addView(ScrollView(this).apply { isFillViewport=true; clipToPadding=false; addView(sceneList); isVerticalScrollBarEnabled=false },LinearLayout.LayoutParams(-1,0,1f))
         return box
@@ -186,10 +180,10 @@ class MainActivity : Activity() {
             else -> "● ${active.name}"
         }
         sceneTag.setTextColor(if(active==null) Design.muted else Design.teal)
-        save.text="Save"
-        save.contentDescription=if(active==null) "Name and save the current lights as a new scene" else "Save the current lights to ${active.name}"
-        save.isEnabled=session.online && state.lamps.isNotEmpty() && active?.locked!=true
-        save.alpha=if(save.isEnabled) 1f else .4f
+        saveGlyph.contentDescription=if(active==null) "Name and save the current lights as a new scene" else "Save the current lights to ${active.name}"
+        val canSave=session.online && state.lamps.isNotEmpty() && active?.locked!=true
+        saveGlyph.isEnabled=canSave
+        saveGlyph.alpha=if(canSave) 1f else .4f
         val sceneKey=state.scenes.toString()+session.activeId+session.dirty+(session.config==null)
         if(sceneKey!=sceneSignature) {
             sceneSignature=sceneKey; sceneList.removeAllViews()

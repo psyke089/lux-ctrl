@@ -2,21 +2,20 @@
 <h1 align="center">Lux / Ctrl</h1>
 <p align="center">A local instrument for your Hue lights.</p>
 <p align="center">
-  <a href="https://codeberg.org/k4r/lux-ctrl"><img src="docs/badges/codeberg.svg" alt="Codeberg: private"></a>
-  <img src="docs/badges/android.svg" alt="Android 7.0+">
-  <img src="docs/badges/kotlin.svg" alt="Native Kotlin">
-  <img src="docs/badges/local.svg" alt="Local network only">
+  <a href="https://codeberg.org/k4r/lux-ctrl/releases"><img src="https://img.shields.io/badge/release-v0.1.0-blue?logo=codeberg&logoColor=white" alt="Release v0.1.0"></a>
+  <img src="https://img.shields.io/badge/vibe_coded-100%25-critical?logo=codeberg&logoColor=white" alt="No human review">
+  <img src="https://img.shields.io/badge/human_review-none-green?logo=codeberg&logoColor=white" alt="Human review: none">
 </p>
 <p align="center"><img src="docs/screenshot-portrait.png" alt="Lux Ctrl on a phone: six radial lamp controls above colorful Hue scene buttons" width="300"></p>
 
-A small, dark Android app for Philips Hue, built from [SPEC.md](docs/SPEC.md) with Kotlin and native Android views. No accounts, cloud calls, analytics, ads, or third-party runtime libraries. All icons, graphics, and badges are drawn in the project.
+A small, dark Android app for Philips Hue, built from [SPEC.md](docs/SPEC.md) with Kotlin and native Android views. No accounts, cloud calls, analytics, ads, or third-party runtime libraries. All icons and graphics are drawn in the project; the badges are rendered by shields.io.
 
 ## Controls
 
 - **Light field:** each named slice is a lamp. Drag outward to brighten, inward to dim; reaching zero turns it off. Release to send the change. Tap a slice for a color disc: the outer ring chooses hue; the inner disc blends saturation and brightness. White temperature remains available on supported lamps. Edits apply as you make them. The heading shows the active scene.
 - **Power:** tap the center to switch all bridge lights off; when all are off, tap to turn them on.
 - **Scenes:** a three-column grid. Tap to activate; hold to rename or delete. Each palette comes from the scene’s stored lamp colors. Changes sync with the Hue bridge and other Hue apps.
-- **Save:** opens a name dialog. With a scene active, the field is prefilled and saving overwrites that scene (renaming it if you change the name). With no scene active, saving creates a new scene from all lamps.
+- **Save:** the header’s disk icon, beside refresh and settings, opens a name dialog. With a scene active, the field is prefilled and saving overwrites that scene (renaming it if you change the name). With no scene active, saving creates a new scene from all lamps.
 - **Landscape:** scenes move left and the light field moves right. The color disc opens from any slice and adapts to landscape; it supports keyboard and accessibility adjustments.
 
 ## Connect

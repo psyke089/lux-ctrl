@@ -48,6 +48,14 @@ class GlyphView @JvmOverloads constructor(context: Context, private val glyph: S
         } else if (glyph == "close") {
             canvas.drawLine(cx-s*.7f,cy-s*.7f,cx+s*.7f,cy+s*.7f,p)
             canvas.drawLine(cx+s*.7f,cy-s*.7f,cx-s*.7f,cy+s*.7f,p)
+        } else if (glyph == "save") {
+            // Floppy disk: body, shutter and label.
+            val r = s*.92f
+            canvas.drawRoundRect(cx-r,cy-r,cx+r,cy+r,s*.18f,s*.18f,p)
+            canvas.drawLine(cx-s*.36f,cy-r,cx-s*.36f,cy-r*.28f,p)
+            canvas.drawLine(cx+s*.36f,cy-r,cx+s*.36f,cy-r*.28f,p)
+            canvas.drawLine(cx-s*.36f,cy-r*.28f,cx+s*.36f,cy-r*.28f,p)
+            canvas.drawRoundRect(cx-s*.6f,cy+r*.08f,cx+s*.6f,cy+r*.8f,s*.12f,s*.12f,p)
         } else {
             canvas.drawArc(cx-s,cy-s,cx+s,cy+s,35f,285f,false,p)
             canvas.drawLine(cx+s*.76f,cy-s*.67f,cx+s*.8f,cy-s*1.15f,p)
