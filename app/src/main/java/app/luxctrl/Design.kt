@@ -31,9 +31,14 @@ object Design {
     }
 }
 
-class GlyphView @JvmOverloads constructor(context: Context, private val glyph: String = "settings") : View(context) {
+class GlyphView @JvmOverloads constructor(context: Context, private val glyph: String = "settings", private val bordered: Boolean = true) : View(context) {
     private val p = Paint(Paint.ANTI_ALIAS_FLAG)
-    init { isClickable = true; isFocusable = true; Design.clickable(this,Design.bg,Design.line,14f) }
+    init {
+        isClickable = true; isFocusable = true
+        // Borderless glyphs stay bare at rest and only show a soft ripple when touched.
+        if (bordered) Design.clickable(this,Design.bg,Design.line,14f)
+        else background = RippleDrawable(ColorStateList.valueOf(0x3052e0d1),null,null)
+    }
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         val s = Design.dp(context,10f); val cx = width/2f; val cy = height/2f
@@ -46,8 +51,9 @@ class GlyphView @JvmOverloads constructor(context: Context, private val glyph: S
                 p.style = Paint.Style.STROKE; p.color = Design.ink; canvas.drawCircle(x,y,s*.25f,p)
             }
         } else if (glyph == "close") {
-            canvas.drawLine(cx-s*.7f,cy-s*.7f,cx+s*.7f,cy+s*.7f,p)
-            canvas.drawLine(cx+s*.7f,cy-s*.7f,cx-s*.7f,cy+s*.7f,p)
+            val e = s*.8f
+            canvas.drawLine(cx-e,cy-e,cx+e,cy+e,p)
+            canvas.drawLine(cx+e,cy-e,cx-e,cy+e,p)
         } else if (glyph == "save") {
             // Floppy disk: body, shutter and label.
             val r = s*.92f

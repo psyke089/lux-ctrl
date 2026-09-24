@@ -379,9 +379,11 @@ class MainActivity : Activity() {
             slider("WHITE TEMPERATURE",lamp.maxMired-lamp.minMired,temperature-lamp.minMired,{ "${1_000_000/(it+lamp.minMired)} K" }) { temperature=it+lamp.minMired; whiteMode=true; updatePreview(); schedule() }
         }
         updatePreview()
-        val title=row()
+        // 24 dp inset like the dialog body. The trailing inset is smaller by half the close button's
+        // slack, so the centred glyph inside it still lands on the body's right edge.
+        val title=row().apply { setPadding(dp(24),dp(16),dp(13),0) }
         title.addView(text(lamp.name,18f,Design.ink).apply { typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL); maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END },LinearLayout.LayoutParams(0,-2,1f))
-        title.addView(GlyphView(this,"close").apply { contentDescription="Close lamp controls"; setOnClickListener { dialog?.dismiss() } },LinearLayout.LayoutParams(dp(48),dp(48)))
+        title.addView(GlyphView(this,"close",false).apply { contentDescription="Close lamp controls"; setOnClickListener { dialog?.dismiss() } },LinearLayout.LayoutParams(dp(40),dp(40)))
         val d=AlertDialog.Builder(this).setCustomTitle(title).setView(ScrollView(this).apply { addView(body) }).create()
         d.setOnDismissListener { flushPending(); closed=true }
         show(d)
