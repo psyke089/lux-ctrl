@@ -47,4 +47,19 @@ class ControlMathTest {
     @Test fun warmWhiteHasLessBlueThanCoolWhite() {
         assertTrue((HueColor.fromMired(500) and 255) < (HueColor.fromMired(153) and 255))
     }
+    @Test fun colorModeWinsOverStaleXyFields() {
+        val xy=0xffff0000.toInt(); val hs=0xff00ff00.toInt(); val ct=0xff0000ff.toInt()
+        // A first-generation bridge serves a stale xy after a hue/sat write; colormode says which
+        // fields are current, so "hs" must not fall back to the stale xy.
+        assertEquals(hs,HueApi.pick("hs",xy,hs,ct))
+        assertEquals(ct,HueApi.pick("ct",xy,hs,ct))
+        assertEquals(xy,HueApi.pick("xy",xy,hs,ct))
+        // Scene light states omit colormode and stay xy-first.
+        assertEquals(xy,HueApi.pick("",xy,hs,ct))
+        assertEquals(hs,HueApi.pick("",null,hs,ct))
+        assertEquals(ct,HueApi.pick("",null,null,ct))
+        assertEquals(HueApi.WARM_WHITE,HueApi.pick("",null,null,null))
+        // Missing fields still fall back to whatever the bridge did send.
+        assertEquals(xy,HueApi.pick("hs",xy,null,ct))
+    }
 }

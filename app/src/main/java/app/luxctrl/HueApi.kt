@@ -72,16 +72,29 @@ class HueApi(private val config: BridgeConfig) {
     fun delete(id: String) { request("DELETE","scenes/${segment(id)}") }
     private fun segment(id: String): String = java.net.URLEncoder.encode(id,"UTF-8")
     companion object {
+        private const val OFF_GREY = 0xff40505b.toInt()
+        internal const val WARM_WHITE = 0xffefd5b0.toInt()
+
+        /** Picks the authoritative colour from a Hue v1 state; see [color]. */
+        internal fun pick(mode: String,xyColor: Int?,hsColor: Int?,ctColor: Int?): Int = when (mode) {
+            "hs" -> hsColor ?: xyColor
+            "ct" -> ctColor ?: xyColor
+            "xy" -> xyColor ?: hsColor
+            // Scene light states carry no colormode; keep the previous xy-first preference.
+            else -> xyColor ?: hsColor ?: ctColor
+        } ?: WARM_WHITE
+
+        /**
+         * Hue v1 names the authoritative fields in "colormode". A first-generation bridge keeps
+         * serving a stale "xy" after a hue/sat write, so the mode has to win over any field order.
+         */
         fun color(s: JSONObject): Int {
-            if (s.has("on") && !s.optBoolean("on")) return 0xff40505b.toInt()
+            if (s.has("on") && !s.optBoolean("on")) return OFF_GREY
             val xy = s.optJSONArray("xy")
-            return when {
-                s.optString("colormode") == "ct" -> HueColor.fromMired(s.optInt("ct",300))
-                xy != null && xy.length() == 2 -> HueColor.fromXy(xy.optDouble(0),xy.optDouble(1))
-                s.has("hue") -> HueColor.fromHsv(s.optInt("hue") * 360f / 65535,s.optInt("sat",254) / 254f)
-                s.has("ct") -> HueColor.fromMired(s.optInt("ct",300))
-                else -> 0xffefd5b0.toInt()
-            }
+            val xyColor = if (xy != null && xy.length() == 2) HueColor.fromXy(xy.optDouble(0),xy.optDouble(1)) else null
+            val hsColor = if (s.has("hue")) HueColor.fromHsv(s.optInt("hue") * 360f / 65535,s.optInt("sat",254) / 254f) else null
+            val ctColor = if (s.has("ct")) HueColor.fromMired(s.optInt("ct",300)) else null
+            return pick(s.optString("colormode"),xyColor,hsColor,ctColor)
         }
     }
 }
