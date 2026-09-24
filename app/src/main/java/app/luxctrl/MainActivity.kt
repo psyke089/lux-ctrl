@@ -105,10 +105,14 @@ class MainActivity : Activity() {
             insets
         }
         val header=row().apply { setPadding(dp(22),dp(10),dp(18),dp(10)) }
+        // Title, bridge status and active scene stack to the same height as the 48 dp buttons.
         val brand=column()
-        brand.addView(text("LUX//CTRL",23f,Design.ink).apply { typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL); letterSpacing=.13f })
-        brand.addView(space(5)); status=text("●  CONNECTING",9f,Design.teal,true); brand.addView(status)
-        header.addView(brand,LinearLayout.LayoutParams(0,dp(48),1f))
+        brand.addView(text("LUX//CTRL",20f,Design.ink).apply { typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL); letterSpacing=.13f })
+        brand.addView(space(1)); status=text("●  CONNECTING",9f,Design.teal,true); brand.addView(status)
+        brand.addView(space(1))
+        sceneTag=text("",9f,Design.muted,true).apply { maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END }
+        brand.addView(sceneTag)
+        header.addView(brand,LinearLayout.LayoutParams(0,-2,1f))
         val refresh=GlyphView(this,"refresh").apply { contentDescription="Refresh lights and scenes"; setOnClickListener { if(hasNetworkPermission()) session.refresh(true) else requestLocalNetwork() } }
         header.addView(refresh,LinearLayout.LayoutParams(dp(48),dp(48)).apply { marginEnd=dp(8) })
         saveGlyph=GlyphView(this,"save").apply { setOnClickListener { saveScene() } }
@@ -129,18 +133,14 @@ class MainActivity : Activity() {
             body.addView(scenes,LinearLayout.LayoutParams(0, -1, .47f))
             body.addView(lamps,LinearLayout.LayoutParams(0,-1,.53f))
         } else {
-            body.addView(lamps,LinearLayout.LayoutParams(-1,0,.60f))
-            body.addView(scenes,LinearLayout.LayoutParams(-1,0,.40f))
+            // The scene tag moved into the header, so the light field keeps the same height as before.
+            body.addView(lamps,LinearLayout.LayoutParams(-1,0,.585f))
+            body.addView(scenes,LinearLayout.LayoutParams(-1,0,.415f))
         }
         root.addView(body,LinearLayout.LayoutParams(-1,0,1f)); setContentView(root); root.requestApplyInsets(); render()
     }
     private fun lampPanel(): LinearLayout {
         val box=column().apply { setPadding(dp(18),dp(6),dp(18),dp(2)) }
-        // The section headline is gone; keep the active-scene status as a slim top-right tag.
-        sceneTag=text("",10f,Design.muted,true).apply {
-            maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END; gravity=Gravity.END
-        }
-        box.addView(sceneTag,LinearLayout.LayoutParams(-1,-2))
         wheel=LampWheel(this).apply {
             onPower = {
                 val turnOn=session.state.lamps.none { it.on }
