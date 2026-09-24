@@ -129,18 +129,17 @@ class MainActivity : Activity() {
             body.addView(lamps,LinearLayout.LayoutParams(0,-1,.53f))
         } else {
             body.addView(lamps,LinearLayout.LayoutParams(-1,0,.60f))
-            body.addView(View(this).apply { setBackgroundColor(Design.line) },LinearLayout.LayoutParams(-1,dp(1)).apply { marginStart=dp(22); marginEnd=dp(22) })
             body.addView(scenes,LinearLayout.LayoutParams(-1,0,.40f))
         }
         root.addView(body,LinearLayout.LayoutParams(-1,0,1f)); setContentView(root); root.requestApplyInsets(); render()
     }
     private fun lampPanel(): LinearLayout {
-        val box=column().apply { setPadding(dp(18),dp(10),dp(18),dp(12)) }
-        val heading=row()
-        heading.addView(text("01  /  LIGHT FIELD",10f,Design.muted,true),LinearLayout.LayoutParams(0,-2,1f))
-        sceneTag=text("",10f,Design.muted,true).apply { maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END; maxWidth=dp(170) }
-        heading.addView(sceneTag)
-        box.addView(heading)
+        val box=column().apply { setPadding(dp(18),dp(6),dp(18),dp(12)) }
+        // The section headline is gone; keep the active-scene status as a slim top-right tag.
+        sceneTag=text("",10f,Design.muted,true).apply {
+            maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END; gravity=Gravity.END
+        }
+        box.addView(sceneTag,LinearLayout.LayoutParams(-1,-2))
         wheel=LampWheel(this).apply {
             onPower = {
                 val turnOn=session.state.lamps.none { it.on }
@@ -153,9 +152,7 @@ class MainActivity : Activity() {
         return box
     }
     private fun scenesPanel(): LinearLayout {
-        val box=column().apply { setPadding(dp(22),dp(15),dp(22),dp(8)) }
-        box.addView(text("02  /  SCENES",10f,Design.muted,true))
-        box.addView(space(12))
+        val box=column().apply { setPadding(dp(22),dp(4),dp(22),dp(4)) }
         sceneList=column()
         box.addView(ScrollView(this).apply { isFillViewport=true; clipToPadding=false; addView(sceneList); isVerticalScrollBarEnabled=false },LinearLayout.LayoutParams(-1,0,1f))
         return box
@@ -190,8 +187,8 @@ class MainActivity : Activity() {
             if(state.scenes.isEmpty()) sceneList.addView(text(if(session.config==null) "Your light, your atmosphere.\nConnect a bridge to get started." else "No scenes yet.\nDial in your lights, then save the mix.",14f).apply { setPadding(dp(5),dp(12),dp(5),dp(18)); setLineSpacing(dp(5).toFloat(),1f) })
             state.scenes.chunked(3).forEach { trio ->
                 val r=row().apply { gravity=Gravity.TOP }
-                trio.forEachIndexed { i,scene -> r.addView(sceneCard(scene),LinearLayout.LayoutParams(0,dp(70),1f).apply { if(i<2) marginEnd=dp(8); bottomMargin=dp(8) }) }
-                for(i in trio.size until 3) r.addView(View(this),LinearLayout.LayoutParams(0,dp(70),1f).apply { if(i<2) marginEnd=dp(8) })
+                trio.forEachIndexed { i,scene -> r.addView(sceneCard(scene),LinearLayout.LayoutParams(0,dp(58),1f).apply { if(i<2) marginEnd=dp(7); bottomMargin=dp(4) }) }
+                for(i in trio.size until 3) r.addView(View(this),LinearLayout.LayoutParams(0,dp(58),1f).apply { if(i<2) marginEnd=dp(7) })
                 sceneList.addView(r)
             }
         }
@@ -200,7 +197,7 @@ class MainActivity : Activity() {
     private fun sceneCard(scene: Scene): View {
         val selected=session.activeId==scene.id
         val box=column().apply {
-            setPadding(dp(10),dp(9),dp(10),dp(9)); gravity=Gravity.CENTER_VERTICAL
+            setPadding(dp(9),dp(6),dp(9),dp(6)); gravity=Gravity.CENTER_VERTICAL
             Design.clickable(this,if(selected) 0xff193139.toInt() else Design.panel,if(selected) Design.teal else Design.line,12f)
             isClickable=true; isFocusable=true
             contentDescription="${scene.name}${if(selected) ", selected" else ""}. Tap to activate; hold to rename or delete."
@@ -215,9 +212,9 @@ class MainActivity : Activity() {
             background=GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, (if(colors.size==1) colors+colors else colors).toIntArray()).apply { cornerRadius=dp(3).toFloat() }
             importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-        box.addView(rail,LinearLayout.LayoutParams(-1,dp(22)))
-        box.addView(space(9))
-        box.addView(text((if(selected) "● " else "")+scene.name,12f,if(selected) Design.teal else Design.ink).apply {
+        box.addView(rail,LinearLayout.LayoutParams(-1,dp(18)))
+        box.addView(space(4))
+        box.addView(text((if(selected) "● " else "")+scene.name,11f,if(selected) Design.teal else Design.ink).apply {
             maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END; typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL)
         })
         return box
