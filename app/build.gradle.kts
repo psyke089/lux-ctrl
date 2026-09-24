@@ -1,5 +1,7 @@
 plugins { id("com.android.application") }
 
+val appVersionName = "0.1.0"
+
 android {
     namespace = "app.luxctrl"
     compileSdk { version = release(37) }
@@ -8,7 +10,7 @@ android {
         minSdk = 24
         targetSdk = 37
         versionCode = 1
-        versionName = "0.1.0"
+        versionName = appVersionName
         testInstrumentationRunner = "app.luxctrl.BridgeSmokeInstrumentation"
     }
     compileOptions {
@@ -16,9 +18,21 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
     buildTypes {
-        release { isMinifyEnabled = true; isShrinkResources = true; proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt")) }
+        // Optimized release, signed with the debug key so it installs without a keystore setup.
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
     testOptions { unitTests.isReturnDefaultValues = true }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.outputs.forEach { output -> output.outputFileName.set("lux-ctrl-$appVersionName.apk") }
+    }
 }
 
 dependencies { testImplementation("junit:junit:4.13.2") }

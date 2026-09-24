@@ -33,6 +33,8 @@ Open this folder in Android Studio, or use JDK 17+ (tested with JDK 25), Android
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
+For an optimized build, `./gradlew :app:assembleRelease` shrinks and minifies with R8 and writes the installable, debug-signed `app/build/outputs/apk/release/lux-ctrl-0.1.0.apk`. No keystore setup is required.
+
 Minimum Android: 7.0 / API 24. Compile/target: API 37. Gradle: 9.6.0; Android Gradle Plugin: 9.4.1. Only the unit tests add a library (JUnit); production uses Kotlin’s standard library and Android APIs. Initial build dependencies need internet; cached builds work with `--offline`.
 
 An optional hardware test exercises the actual Kotlin bridge client, including lamp writes, scene create/rename/overwrite/recall/delete, and global power. It briefly changes lights, creates only a temporary scene, then restores the original lamp states. Configure the debug app first:
@@ -43,4 +45,4 @@ adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell am instrument -w -e live true app.luxctrl.test/app.luxctrl.BridgeSmokeInstrumentation
 ```
 
-See the [color disc](docs/screenshot-color-disc.png), [verification notes](docs/verification.md) and the [landscape screenshot](docs/screenshot-landscape.png). Release APKs are unsigned until you provide your own signing configuration.
+See the [color disc](docs/screenshot-color-disc.png), [verification notes](docs/verification.md) and the [landscape screenshot](docs/screenshot-landscape.png).
