@@ -13,11 +13,11 @@ A small, dark Android app for Philips Hue, built from [SPEC.md](SPEC.md) with Ko
 
 ## Controls
 
-- **Light field:** each slice is a lamp. Drag outward to brighten, inward to dim; reaching zero turns it off. Release to send the change. Tap a slice or its named button for color, saturation, brightness, and supported white-temperature controls.
+- **Light field:** each slice is a lamp. Drag outward to brighten, inward to dim; reaching zero turns it off. Release to send the change. Tap a slice or its named button for a color disc: the outer ring chooses hue; the inner disc blends saturation and brightness. White temperature remains available on supported lamps. Changes are sent only when you tap **Apply**.
 - **Power:** tap the center to switch all bridge lights off; when all are off, tap to turn them on.
 - **Scenes:** tap to activate; hold to rename or delete. Each palette comes from the scene’s stored lamp colors. Changes sync with the Hue bridge and other Hue apps.
 - **Save:** overwrites the selected scene’s included lamps with their current states. **+ New** clears the selection so Save asks for a new name and captures all lamps. Manual light edits retain the selected scene for overwriting.
-- **Landscape:** scenes move left and the light field moves right. Named controls and standard sliders offer an alternative to radial gestures.
+- **Landscape:** scenes move left and the light field moves right. Named controls open the same picker as their circle slices. The picker adapts to landscape, and supports keyboard and accessibility adjustments.
 
 ## Connect
 
@@ -44,4 +44,4 @@ adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell am instrument -w -e live true app.luxctrl.test/app.luxctrl.BridgeSmokeInstrumentation
 ```
 
-See [verification notes](docs/verification.md) and the [landscape screenshot](docs/screenshot-landscape.png). Release APKs are unsigned until you provide your own signing configuration.
+See the [color disc](docs/screenshot-color-disc.png), [verification notes](docs/verification.md) and the [landscape screenshot](docs/screenshot-landscape.png). Release APKs are unsigned until you provide your own signing configuration.

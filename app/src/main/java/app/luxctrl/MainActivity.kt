@@ -293,15 +293,60 @@ class MainActivity : Activity() {
         if(!lamp.reachable) { toast("${lamp.name} is unreachable. Check its wall switch."); return }
         if(!session.online || session.busy) return
         val body=dialogBody()
+        var pickerLandscape=resources.configuration.orientation==Configuration.ORIENTATION_LANDSCAPE
         var bri=if(lamp.on) lamp.brightness else 0
         val hsv=FloatArray(3); Color.colorToHSV(lamp.color,hsv)
-        var hue=hsv[0].roundToInt(); var sat=(hsv[1]*100).roundToInt(); var temperature=300
+        var hue=hsv[0]; var sat=hsv[1]; var temperature=300
         var colorChanged=false; var whiteMode=false
-        val preview=View(this).apply { background=Design.shape(context,lamp.color,lamp.color,12f) }
-        body.addView(preview,LinearLayout.LayoutParams(-1,dp(38))); body.addView(space(15))
-        fun updatePreview() { val color=if(whiteMode) HueColor.fromMired(temperature) else HueColor.fromHsv(hue.toFloat(),sat/100f); preview.background=Design.shape(this,color,color,12f); preview.alpha=if(bri==0) .25f else .35f+.65f*bri/254 }
+        val controls=column()
+        val preview=View(this).apply { background=Design.shape(context,lamp.color,lamp.color,12f); contentDescription="Selected color preview" }
+        val readout=text("",10f,Design.muted,true)
+        var picker: ColorDiscView?=null
+        fun updatePreview() {
+            val color=if(whiteMode) HueColor.fromMired(temperature) else Color.HSVToColor(floatArrayOf(hue,sat,1f))
+            preview.background=Design.shape(this,color,color,12f)
+            preview.alpha=if(bri==0) .15f else .3f+.7f*bri/254
+            readout.text=if(whiteMode) "WHITE · ${(bri/254f*100).roundToInt()}% LIGHT" else "${(sat*100).roundToInt()}% SAT · ${(bri/254f*100).roundToInt()}% LIGHT"
+            picker?.alpha=if(whiteMode) .55f else 1f
+        }
+        if(lamp.colorCapable) {
+            picker=ColorDiscView(this).apply {
+                setColor(hue,sat,bri/254f)
+                onColorChanged={ h,s,v ->
+                    hue=h; sat=s; bri=(v*254).roundToInt(); whiteMode=false; colorChanged=true
+                    updatePreview()
+                }
+            }
+            val discPanel=column()
+            val discLayout=LinearLayout.LayoutParams(-1,dp(280))
+            discPanel.addView(picker,discLayout)
+            discPanel.addView(text("RING: HUE · DISC: SATURATION + LIGHT",9f,Design.muted,true).apply { gravity=Gravity.CENTER; setPadding(0,dp(4),0,dp(12)) })
+            fun arrangePicker() {
+                body.removeAllViews()
+                val discSize=if(pickerLandscape) (resources.configuration.screenHeightDp-170).coerceIn(160,240) else 280
+                discLayout.height=dp(discSize); picker.layoutParams=discLayout
+                body.orientation=if(pickerLandscape) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+                if(pickerLandscape) {
+                    body.addView(discPanel,LinearLayout.LayoutParams(dp(discSize),-2).apply { marginEnd=dp(20) })
+                    body.addView(controls,LinearLayout.LayoutParams(0,-2,1f))
+                } else {
+                    body.addView(discPanel,LinearLayout.LayoutParams(-1,-2))
+                    body.addView(controls,LinearLayout.LayoutParams(-1,-2))
+                }
+            }
+            arrangePicker()
+            body.addOnLayoutChangeListener { _,_,_,_,_,_,_,_,_ ->
+                val nowLandscape=resources.configuration.orientation==Configuration.ORIENTATION_LANDSCAPE
+                if(nowLandscape!=pickerLandscape) {
+                    pickerLandscape=nowLandscape
+                    arrangePicker()
+                }
+            }
+        } else body.addView(controls)
+        controls.addView(preview,LinearLayout.LayoutParams(-1,dp(30)))
+        controls.addView(space(10)); controls.addView(readout); controls.addView(space(16))
         fun slider(label: String,max: Int,initial: Int,format: (Int)->String,onChange: (Int)->Unit): SeekBar {
-            val t=text("$label  ${format(initial)}",11f,Design.muted,true); body.addView(t)
+            val t=text("$label  ${format(initial)}",11f,Design.muted,true); controls.addView(t)
             return SeekBar(this).apply {
                 this.max=max; progress=initial; contentDescription=label
                 setOnSeekBarChangeListener(object: SeekBar.OnSeekBarChangeListener {
@@ -309,26 +354,23 @@ class MainActivity : Activity() {
                     override fun onStartTrackingTouch(s: SeekBar?) {}
                     override fun onStopTrackingTouch(s: SeekBar?) {}
                 })
-                body.addView(this,LinearLayout.LayoutParams(-1,dp(48)))
+                controls.addView(this,LinearLayout.LayoutParams(-1,dp(48)))
             }
         }
-        if(lamp.dimmable) slider("BRIGHTNESS",254,bri,{ "${(it/254f*100).roundToInt()}%" }) { bri=it; updatePreview() }
-        else body.addView(Switch(this).apply { text="Power"; isChecked=lamp.on; setOnCheckedChangeListener { _,on -> bri=if(on)254 else 0 } })
-        if(lamp.colorCapable) {
-            slider("HUE",360,hue,{ "$it°" }) { hue=it; whiteMode=false; colorChanged=true; updatePreview() }
-            slider("SATURATION",100,sat,{ "$it%" }) { sat=it; whiteMode=false; colorChanged=true; updatePreview() }
-        }
+        if(!lamp.colorCapable && lamp.dimmable) slider("BRIGHTNESS",254,bri,{ "${(it/254f*100).roundToInt()}%" }) { bri=it; updatePreview() }
+        else if(!lamp.dimmable) controls.addView(Switch(this).apply { text="Power"; isChecked=lamp.on; setOnCheckedChangeListener { _,on -> bri=if(on)254 else 0; updatePreview() } })
         if(lamp.temperatureCapable) {
             temperature=300.coerceIn(lamp.minMired,lamp.maxMired)
             slider("WHITE TEMPERATURE",lamp.maxMired-lamp.minMired,temperature-lamp.minMired,{ "${1_000_000/(it+lamp.minMired)} K" }) { temperature=it+lamp.minMired; whiteMode=true; colorChanged=true; updatePreview() }
         }
-        body.addView(text("Changes apply when you tap Apply.\nBrightness at zero switches this lamp off.",11f))
+        controls.addView(text("Changes apply when you tap Apply.\nZero brightness switches this lamp off.",11f))
+        updatePreview()
         val d=AlertDialog.Builder(this).setTitle(lamp.name).setView(ScrollView(this).apply { addView(body) }).setNegativeButton("Cancel",null).setNeutralButton(if(lamp.on) "Turn off" else "Turn on") { _,_ -> setBrightness(lamp,if(lamp.on)0 else lamp.brightness.coerceAtLeast(1)) }.setPositiveButton("Apply") { _,_ ->
             val payload=JSONObject().put("on",bri>0)
             if(lamp.dimmable && bri>0) payload.put("bri",bri.coerceAtLeast(1))
             if(colorChanged) {
                 if(whiteMode) payload.put("ct",temperature)
-                else payload.put("hue",(hue/360.0*65535).roundToInt().coerceIn(0,65535)).put("sat",(sat/100.0*254).roundToInt())
+                else payload.put("hue",(hue/360.0*65535).roundToInt().coerceIn(0,65535)).put("sat",(sat*254).roundToInt())
             }
             session.change("${lamp.name} updated",edit=true) { api -> api.setLight(lamp.id,payload); null }
         }.create(); show(d)
