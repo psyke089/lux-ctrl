@@ -9,14 +9,14 @@ import android.view.View
 import android.widget.TextView
 
 object Design {
-    val bg = Color.rgb(5,8,19)
-    val panel = Color.rgb(12,19,37)
-    val line = Color.rgb(37,62,88)
+    val bg = Color.rgb(3,7,16)
+    val panel = Color.rgb(9,18,32)
+    val line = Color.rgb(38,65,84)
     val ink = Color.rgb(230,246,255)
     val muted = Color.rgb(142,164,190)
     val teal = Color.rgb(89,247,235)
     val violet = Color.rgb(163,118,255)
-    val amber = Color.rgb(255,189,119)
+    val amber = Color.rgb(255,171,91)
     fun alpha(color: Int, value: Int) = (color and 0x00ffffff) or (value.coerceIn(0,255) shl 24)
     fun mix(a: Int, b: Int, t: Float): Int = Color.rgb(
         (Color.red(a)+(Color.red(b)-Color.red(a))*t).toInt(),

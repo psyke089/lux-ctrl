@@ -64,6 +64,7 @@ class ColorDiscView(context: Context) : View(context) {
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        paint.color = Color.WHITE // Marker accents must not carry their alpha into the hue shader.
         paint.style = Paint.Style.STROKE
         paint.strokeWidth = radius*.28f
         paint.shader = ringShader
@@ -82,6 +83,16 @@ class ColorDiscView(context: Context) : View(context) {
             paint.color=Design.alpha(Design.teal,if(tick%5==0) 160 else 65)
             canvas.drawLine(cx+cos(a).toFloat()*r1,cy+sin(a).toFloat()*r1,
                 cx+cos(a).toFloat()*r2,cy+sin(a).toFloat()*r2,paint)
+        }
+        // Registration marks and a spectral inner scale turn the picker into an optical instrument.
+        val scaleR=(discRadius+radius*.70f)/2
+        paint.strokeWidth=dp
+        for(tick in 0 until 72) {
+            val a=tick*PI/36
+            val end=scaleR+(if(tick%6==0) 3 else 1)*dp
+            paint.color=Design.alpha(Design.ink,if(tick%6==0) 150 else 55)
+            canvas.drawLine(cx+cos(a).toFloat()*scaleR,cy+sin(a).toFloat()*scaleR,
+                cx+cos(a).toFloat()*end,cy+sin(a).toFloat()*end,paint)
         }
         bitmap?.let { b ->
             if (bitmapHue != hue) {
@@ -119,6 +130,13 @@ class ColorDiscView(context: Context) : View(context) {
         paint.style = Paint.Style.FILL; paint.color = color; canvas.drawCircle(x,y,r,paint)
         paint.style = Paint.Style.STROKE; paint.color = Color.WHITE; paint.strokeWidth = Design.dp(context,1.8f)
         canvas.drawCircle(x,y,r,paint)
+        val dp=resources.displayMetrics.density
+        paint.strokeWidth=dp; paint.color=Design.alpha(Color.WHITE,190)
+        for(i in 0..3) {
+            val a=i*PI/2
+            canvas.drawLine(x+cos(a).toFloat()*(r+3*dp),y+sin(a).toFloat()*(r+3*dp),
+                x+cos(a).toFloat()*(r+6*dp),y+sin(a).toFloat()*(r+6*dp),paint)
+        }
     }
 
     private fun region(x: Float,y: Float): Int {

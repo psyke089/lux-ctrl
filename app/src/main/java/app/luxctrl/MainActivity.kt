@@ -28,6 +28,8 @@ class MainActivity : Activity() {
     private lateinit var wheel: LampWheel
     private lateinit var status: TextView
     private lateinit var sceneTag: TextView
+    private lateinit var lampCount: TextView
+    private lateinit var sceneCount: TextView
     private lateinit var errorText: TextView
     private lateinit var sceneList: LinearLayout
     private lateinit var sceneViewport: ScrollView
@@ -35,6 +37,7 @@ class MainActivity : Activity() {
     private var sceneSignature = ""
     private var resumed = false
     private var dialog: AlertDialog? = null
+    private var onDialogConfigurationChanged: (() -> Unit)? = null
     private var intervalSeconds = 10
     /** Set when a scene is activated so only that change glides; direct gestures snap. */
     private var glideNextLamps = false
@@ -74,7 +77,11 @@ class MainActivity : Activity() {
         if (!isChangingConfigurations) session.close()
         super.onDestroy()
     }
-    override fun onConfigurationChanged(newConfig: Configuration) { super.onConfigurationChanged(newConfig); buildContent() }
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        buildContent()
+        onDialogConfigurationChanged?.invoke()
+    }
     private fun hasNetworkPermission() = Build.VERSION.SDK_INT < 37 || checkSelfPermission("android.permission.ACCESS_LOCAL_NETWORK") == PackageManager.PERMISSION_GRANTED
     private fun requestLocalNetwork() {
         if (Build.VERSION.SDK_INT >= 37) requestPermissions(arrayOf("android.permission.ACCESS_LOCAL_NETWORK"),7)
@@ -109,7 +116,7 @@ class MainActivity : Activity() {
         val header=row().apply { setPadding(dp(22),dp(10),dp(18),dp(10)) }
         // Title, bridge status and active scene stack to the same height as the 48 dp buttons.
         val brand=column()
-        brand.addView(text("LUX//CTRL",20f,Design.ink).apply {
+        brand.addView(text("LUX//CTRL",21f,Design.ink).apply {
             typeface=Typeface.create("sans-serif-black",Typeface.ITALIC); letterSpacing=.13f
             setShadowLayer(dp(8).toFloat(),0f,0f,Design.alpha(Design.teal,90))
             paint.shader=LinearGradient(0f,0f,paint.measureText("LUX//CTRL"),0f,
@@ -127,6 +134,10 @@ class MainActivity : Activity() {
         val settings=GlyphView(this,"settings").apply { contentDescription="Bridge settings"; setOnClickListener { settings() } }
         header.addView(settings,LinearLayout.LayoutParams(dp(48),dp(48)))
         root.addView(header)
+        root.addView(View(this).apply { background=android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.LEFT_RIGHT,
+            intArrayOf(Design.alpha(Design.teal,160),Design.alpha(Design.teal,25),Design.alpha(Design.violet,100))) },
+            LinearLayout.LayoutParams(-1,dp(1)).apply { marginStart=dp(22); marginEnd=dp(22) })
         errorText=text("",12f,Design.amber).apply {
             setPadding(dp(22),dp(9),dp(22),dp(9)); setBackgroundColor(0xff29231e.toInt()); visibility=View.GONE
             isClickable=true; isFocusable=true
@@ -140,14 +151,31 @@ class MainActivity : Activity() {
             body.addView(scenes,LinearLayout.LayoutParams(0, -1, .47f))
             body.addView(lamps,LinearLayout.LayoutParams(0,-1,.53f))
         } else {
-            // The scene tag moved into the header, so the light field keeps the same height as before.
-            body.addView(lamps,LinearLayout.LayoutParams(-1,0,.585f))
-            body.addView(scenes,LinearLayout.LayoutParams(-1,0,.415f))
+            val lampLayout=LinearLayout.LayoutParams(-1,0,.585f)
+            val sceneLayout=LinearLayout.LayoutParams(-1,0,.415f)
+            body.addView(lamps,lampLayout)
+            body.addView(scenes,sceneLayout)
+            // Reserve four touch-sized scene rows plus their heading on shorter phones.
+            body.addOnLayoutChangeListener { _,_,top,_,bottom,_,_,_,_ ->
+                val share=(dp(228).toFloat()/(bottom-top).coerceAtLeast(1)).coerceIn(.415f,.6f)
+                if(kotlin.math.abs(sceneLayout.weight-share)>.005f) {
+                    sceneLayout.weight=share; lampLayout.weight=1f-share
+                    body.post { lamps.requestLayout(); scenes.requestLayout() }
+                }
+            }
         }
         root.addView(body,LinearLayout.LayoutParams(-1,0,1f)); setContentView(root); root.requestApplyInsets(); render()
     }
+    private fun sectionHeading(number: String, title: String, readout: TextView): View = row().apply {
+        setPadding(0,dp(6),0,dp(6))
+        addView(text(number,9f,Design.amber,true),LinearLayout.LayoutParams(dp(23),-2))
+        addView(text(title,10f,Design.ink,true),LinearLayout.LayoutParams(0,-2,1f))
+        addView(readout)
+    }
     private fun lampPanel(): LinearLayout {
         val box=column().apply { setPadding(dp(18),dp(6),dp(18),dp(2)) }
+        lampCount=text("",8f,Design.teal,true)
+        box.addView(sectionHeading("01", "LIGHT FIELD", lampCount))
         wheel=LampWheel(this).apply {
             onPower = {
                 val turnOn=session.state.lamps.none { it.on }
@@ -157,10 +185,15 @@ class MainActivity : Activity() {
             onBrightness={ lamp,bri -> setBrightness(lamp,bri) }
         }
         box.addView(wheel,LinearLayout.LayoutParams(-1,0,1f))
+        box.addView(text("DRAG TO DIM  /  TAP TO TUNE",8f,Design.muted,true).apply {
+            gravity=Gravity.CENTER; setPadding(0,dp(2),0,dp(7))
+        })
         return box
     }
     private fun scenesPanel(): LinearLayout {
         val box=column().apply { setPadding(dp(22),dp(0),dp(22),dp(4)) }
+        sceneCount=text("",8f,Design.teal,true)
+        box.addView(sectionHeading("02", "SCENE ARRAY", sceneCount))
         sceneList=column()
         sceneViewport=ScrollView(this).apply {
             isFillViewport=true; clipToPadding=false; addView(sceneList); isVerticalScrollBarEnabled=false
@@ -172,7 +205,7 @@ class MainActivity : Activity() {
     /** Keep the original 3 × 4 grid within the viewport, including shorter landscape screens. */
     private fun fitSceneRows() {
         if(sceneViewport.height<=0 || session.state.scenes.isEmpty()) return
-        val cardHeight=minOf(dp(58),(sceneViewport.height/4-dp(4)).coerceAtLeast(dp(44)))
+        val cardHeight=minOf(dp(66),(sceneViewport.height/4-dp(5)).coerceAtLeast(dp(44)))
         for(rowIndex in 0 until sceneList.childCount) {
             val row=sceneList.getChildAt(rowIndex) as? LinearLayout ?: continue
             for(i in 0 until row.childCount) {
@@ -187,6 +220,8 @@ class MainActivity : Activity() {
     private fun render() {
         if (!::wheel.isInitialized || isDestroyed) return
         val state=session.state
+        lampCount.text="${state.lamps.count { it.on && it.reachable }.toString().padStart(2,'0')} / ${state.lamps.size.toString().padStart(2,'0')} ON"
+        sceneCount.text="${state.scenes.size.toString().padStart(2,'0')} STORED"
         status.text=when {
             session.config==null -> "●  SET UP YOUR BRIDGE"
             !hasNetworkPermission() -> "●  LOCAL ACCESS NEEDED"
@@ -217,7 +252,7 @@ class MainActivity : Activity() {
             if(state.scenes.isEmpty()) sceneList.addView(text(if(session.config==null) "Your light, your atmosphere.\nConnect a bridge to get started." else "No scenes yet.\nDial in your lights, then save the mix.",14f).apply { setPadding(dp(5),dp(12),dp(5),dp(18)); setLineSpacing(dp(5).toFloat(),1f) })
             state.scenes.chunked(3).forEach { trio ->
                 val r=row().apply { gravity=Gravity.TOP }
-                trio.forEachIndexed { i,scene -> r.addView(sceneCard(scene),LinearLayout.LayoutParams(0,dp(58),1f).apply { if(i<2) marginEnd=dp(7); bottomMargin=dp(4) }) }
+                trio.forEachIndexed { i,scene -> r.addView(sceneCard(scene),LinearLayout.LayoutParams(0,dp(58),1f).apply { if(i<2) marginEnd=dp(7); bottomMargin=dp(5) }) }
                 for(i in trio.size until 3) r.addView(View(this),LinearLayout.LayoutParams(0,dp(58),1f).apply { if(i<2) marginEnd=dp(7) })
                 sceneList.addView(r)
             }
@@ -244,7 +279,7 @@ class MainActivity : Activity() {
             background=SpectrumDrawable(this@MainActivity,colors)
             importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
-        box.addView(rail,LinearLayout.LayoutParams(-1,dp(18)))
+        box.addView(rail,LinearLayout.LayoutParams(-1,0,1f))
         box.addView(space(4))
         box.addView(text((if(selected) "● " else "")+scene.name,11f,if(selected) Design.teal else Design.ink).apply {
             maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END; typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL)
@@ -308,6 +343,7 @@ class MainActivity : Activity() {
         if(!session.online || session.busy) return
         val body=dialogBody()
         var pickerLandscape=resources.configuration.orientation==Configuration.ORIENTATION_LANDSCAPE
+        var arrangeForConfiguration: (() -> Unit)? = null
         var bri=if(lamp.on) lamp.brightness else 0
         val hsv=FloatArray(3); Color.colorToHSV(lamp.color,hsv)
         var hue=hsv[0]; var sat=hsv[1]; var temperature=300
@@ -377,12 +413,11 @@ class MainActivity : Activity() {
                 }
             }
             arrangePicker()
-            body.addOnLayoutChangeListener { _,_,_,_,_,_,_,_,_ ->
-                val nowLandscape=resources.configuration.orientation==Configuration.ORIENTATION_LANDSCAPE
-                if(nowLandscape!=pickerLandscape) {
-                    pickerLandscape=nowLandscape
-                    arrangePicker()
-                }
+            // Reflow before the next layout pass; changing children inside onLayout can leave
+            // the portrait arrangement measured into a landscape dialog until another redraw.
+            arrangeForConfiguration = {
+                pickerLandscape=resources.configuration.orientation==Configuration.ORIENTATION_LANDSCAPE
+                arrangePicker()
             }
         } else body.addView(controls)
         controls.addView(preview,LinearLayout.LayoutParams(-1,dp(30)))
@@ -412,8 +447,9 @@ class MainActivity : Activity() {
         title.addView(text(lamp.name,18f,Design.ink).apply { typeface=Typeface.create("sans-serif-medium",Typeface.NORMAL); maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END },LinearLayout.LayoutParams(0,-2,1f))
         title.addView(GlyphView(this,"close",false).apply { contentDescription="Close lamp controls"; setOnClickListener { dialog?.dismiss() } },LinearLayout.LayoutParams(dp(40),dp(40)))
         val d=AlertDialog.Builder(this).setCustomTitle(title).setView(ScrollView(this).apply { addView(body) }).create()
-        d.setOnDismissListener { flushPending(); closed=true }
+        d.setOnDismissListener { flushPending(); closed=true; onDialogConfigurationChanged=null }
         show(d)
+        onDialogConfigurationChanged=arrangeForConfiguration
     }
     private fun saveScene() {
         if(session.busy || !session.online) return
