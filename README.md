@@ -2,7 +2,7 @@
 <h1 align="center">Lux / Ctrl</h1>
 <p align="center">A local instrument for your Hue lights.</p>
 <p align="center">
-  <a href="https://codeberg.org/k4r/lux-ctrl/releases"><img src="https://img.shields.io/badge/release-v0.2.0-blue?logo=codeberg&logoColor=white" alt="Release v0.2.0"></a>
+  <a href="https://codeberg.org/k4r/lux-ctrl/releases"><img src="https://img.shields.io/badge/release-v0.3.0-blue?logo=codeberg&logoColor=white" alt="Release v0.3.0"></a>
   <img src="https://img.shields.io/badge/vibe_coded-100%25-critical?logo=codeberg&logoColor=white" alt="No human review">
   <img src="https://img.shields.io/badge/human_review-none-green?logo=codeberg&logoColor=white" alt="Human review: none">
 </p>
@@ -33,7 +33,7 @@ Open this folder in Android Studio, or use JDK 17+ (tested with JDK 25), Android
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
-For an optimized build, `./gradlew :app:assembleRelease` shrinks and minifies with R8 and writes the installable, debug-signed `app/build/outputs/apk/release/lux-ctrl-0.2.0.apk`. No keystore setup is required.
+For an optimized build, `./gradlew :app:assembleRelease` shrinks and minifies with R8 and writes the installable, debug-signed `app/build/outputs/apk/release/lux-ctrl-0.3.0.apk`. No keystore setup is required.
 
 Minimum Android: 7.0 / API 24. Compile/target: API 37. Gradle: 9.6.0; Android Gradle Plugin: 9.4.1. Only the unit tests add a library (JUnit); production uses Kotlin’s standard library and Android APIs. Initial build dependencies need internet; cached builds work with `--offline`.
 
