@@ -1,5 +1,7 @@
 package app.luxctrl
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.animation.ArgbEvaluator
 import android.animation.ValueAnimator
 import android.content.Context
@@ -16,17 +18,42 @@ import kotlin.math.*
 class LampWheel(context: Context) : View(context) {
     var lamps: List<Lamp> = emptyList()
         private set
-    /** Scene changes glide between states; direct gestures (dimming a slice) snap. */
+    /** Bridge state is authoritative; a power request only charges the hub until it settles. */
     fun setLamps(value: List<Lamp>, animate: Boolean) {
+        val previous=shown()
+        val arrival=onlineArrival && ready && value.isNotEmpty()
+        val power=powerRequest != null && interactive
         if(lamps!=value || holdIndex>=0 || display!=value) dialDirty=true
-        lamps = value
-        // Once the request has settled, trust the bridge rather than the held gesture value.
-        if (interactive) holdIndex = -1
-        if (animate && motionAllowed()) animateTo(value) else { animator?.cancel(); display = value; invalidate() }
-        updateDescription()
+        val changed=lamps!=value
+        lamps=value
+        if(interactive) holdIndex=-1
+        if(arrival || power) {
+            val up=if(arrival) true else powerRequest==true
+            onlineArrival=false; powerRequest=null
+            val from=if(arrival) value.map { it.copy(on=false,brightness=0) } else previous
+            animateTo(from,value,true,up)
+        } else if(changed || (animator==null && display!=value)) {
+            if(animate) animateTo(previous,value) else finishTransition()
+        }
+        updateDescription(); invalidate()
     }
     var ready = false
-        set(value) { if (field != value) { field = value; dialDirty=true; invalidate() } }
+        set(value) {
+            if(field==value) return
+            field=value; dialDirty=true
+            if(value) onlineArrival=true
+            else { onlineArrival=false; powerRequest=null; finishTransition() }
+            invalidate()
+        }
+    private var onlineArrival=false
+    private var powerRequest: Boolean?=null
+    private var transitionProgress=1f
+    private var powerTransition=false
+    private var poweringUp=true
+    fun preparePowerTransition(turnOn: Boolean) {
+        powerRequest=turnOn
+        invalidate()
+    }
     /** Touch input is off while a request is in flight, without flickering the hub. */
     var interactive = false
     var onPower: () -> Unit = {}
@@ -55,14 +82,12 @@ class LampWheel(context: Context) : View(context) {
     private val sector = Path()
     private val arc = RectF()
     private var aura: Shader? = null
-    private var hub: Shader? = null
     private var shell: Shader? = null
-    private var coreGlow: Shader? = null
-    private val lensOrbit=RectF()
+    private var coreHalo: Shader? = null
+    private var coreSpectrum: Shader? = null
+    private val iris=Path()
     private val sectorShaders = mutableMapOf<Int, Pair<Int, Shader>>()
     private val labelFont = Typeface.create("sans-serif-medium",Typeface.NORMAL)
-    private val monoFont = Typeface.create("monospace",Typeface.NORMAL)
-    private val readoutBounds = RectF()
 
     private fun motionAllowed() = if(Build.VERSION.SDK_INT>=26) ValueAnimator.areAnimatorsEnabled()
         else Settings.Global.getFloat(context.contentResolver,Settings.Global.ANIMATOR_DURATION_SCALE,1f)>0f
@@ -78,14 +103,14 @@ class LampWheel(context: Context) : View(context) {
                 }
                 start()
             }
-        } else if(!running) { orbit?.cancel(); orbit=null }
+        } else if(!running) { orbit?.cancel(); orbit=null; finishTransition() }
     }
     override fun onAttachedToWindow() { super.onAttachedToWindow(); syncOrbit() }
     override fun onWindowVisibilityChanged(visibility: Int) { super.onWindowVisibilityChanged(visibility); syncOrbit() }
     override fun onVisibilityChanged(changedView: View, visibility: Int) { super.onVisibilityChanged(changedView,visibility); syncOrbit() }
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) { super.onWindowFocusChanged(hasWindowFocus); syncOrbit() }
     override fun onDetachedFromWindow() {
-        orbit?.cancel(); orbit=null; animator?.cancel(); animator=null
+        orbit?.cancel(); orbit=null; finishTransition()
         dialTexture?.recycle(); dialTexture=null; textureCanvas=null; dialDirty=true
         super.onDetachedFromWindow()
     }
@@ -93,14 +118,14 @@ class LampWheel(context: Context) : View(context) {
         sectorShaders.clear()
         dialTexture?.recycle(); dialTexture=null; textureCanvas=null; dialDirty=true
         val r=outer.coerceAtLeast(1f)
+        coreHalo=RadialGradient(cx,cy,inner.coerceAtLeast(1f),
+            intArrayOf(0x1038fff0,0x0838fff0,0x4038fff0,0x0038fff0),
+            floatArrayOf(0f,.4f,.65f,1f),Shader.TileMode.CLAMP)
+        coreSpectrum=SweepGradient(cx,cy,intArrayOf(Design.teal,Design.violet,Design.teal,Design.violet,Design.teal),null)
         aura=RadialGradient(cx,cy,r*1.12f,intArrayOf(0x00206880,0x00206880,0x20206880,0x00206880),floatArrayOf(0f,.65f,.88f,1f),Shader.TileMode.CLAMP)
         shell=RadialGradient(cx,cy,r*1.02f,
             intArrayOf(0xff020711.toInt(),0xff081725.toInt(),0xff050b17.toInt(),0xff193348.toInt()),
             floatArrayOf(0f,.4f,.94f,1f),Shader.TileMode.CLAMP)
-        hub=RadialGradient(cx,cy,inner.coerceAtLeast(1f),
-            intArrayOf(0xff173c4d.toInt(),0xff040a15.toInt(),0xff142d45.toInt()),floatArrayOf(0f,.6f,1f),Shader.TileMode.CLAMP)
-        coreGlow=RadialGradient(cx,cy,(inner*.66f).coerceAtLeast(1f),
-            intArrayOf(0x6033eee9,0x122370a9,0x002370a9),null,Shader.TileMode.CLAMP)
     }
     private fun sectorShader(index: Int,color: Int): Shader {
         val cached=sectorShaders[index]
@@ -120,25 +145,45 @@ class LampWheel(context: Context) : View(context) {
     }
     private fun shown(): List<Lamp> = if (display.size == lamps.size) display else lamps
 
-    /** Scene changes glide between the old and the new lamp states instead of snapping. */
-    private fun animateTo(target: List<Lamp>) {
-        animator?.cancel()
-        val from = shown()
-        if (from.size != target.size || from.isEmpty() || from == target || from.map { it.id } != target.map { it.id }) {
-            display = target; invalidate(); return
+    private fun finishTransition() {
+        animator?.cancel(); animator=null
+        display=lamps; powerTransition=false; transitionProgress=1f
+        dialDirty=true; invalidate()
+    }
+
+    /** Longer radial ignition/quench for global power; scene changes retain their short glide. */
+    private fun animateTo(from: List<Lamp>, target: List<Lamp>, power: Boolean=false, up: Boolean=true) {
+        animator?.cancel(); animator=null
+        if(!motionAllowed() || !isAttachedToWindow || !isShown || !hasWindowFocus() ||
+            from.isEmpty() || from.map { it.id }!=target.map { it.id }) {
+            finishTransition(); return
         }
-        animator = ValueAnimator.ofFloat(0f,1f).apply {
-            duration = 450
+        poweringUp=up; powerTransition=power; transitionProgress=0f
+        display=from
+        animator=ValueAnimator.ofFloat(0f,1f).apply {
+            duration=if(power) 1350 else 450
+            interpolator=LinearInterpolator()
             addUpdateListener { a ->
-                val t = a.animatedValue as Float
-                display = from.mapIndexed { i, old ->
-                    val next = target[i]
-                    val b = (old.brightness + (next.brightness-old.brightness)*t).roundToInt()
-                    val c = if (old.color == next.color) next.color else argb.evaluate(t,old.color,next.color) as Int
-                    next.copy(on = b > 0, brightness = b, color = c)
+                val t=a.animatedValue as Float
+                transitionProgress=t
+                display=from.mapIndexed { i,old ->
+                    val next=target[i]
+                    // A short sequential offset starts at twelve o'clock, then fans around.
+                    val delay=if(power) i.toFloat()/target.size*.18f else 0f
+                    val local=((t-delay)/(1f-delay)).coerceIn(0f,1f)
+                    val eased=local*local*(3f-2f*local)
+                    val b=WheelMath.transitionBrightness(old.on,old.brightness,next.on,next.brightness,eased)
+                    val color=if(old.color==next.color) next.color else argb.evaluate(eased,old.color,next.color) as Int
+                    next.copy(on=b>0,brightness=b,color=color)
                 }
                 dialDirty=true; invalidate()
             }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    if(animator===animation) animator=null
+                    display=target; powerTransition=false; transitionProgress=1f; dialDirty=true; invalidate()
+                }
+            })
             start()
         }
     }
@@ -245,11 +290,6 @@ class LampWheel(context: Context) : View(context) {
                     paint.strokeWidth=dp*3.3f
                     paint.color=if(lit) Design.alpha(color,strength) else Design.alpha(Design.line,65)
                     c.drawArc(cx-rr,cy-rr,cx+rr,cy+rr,angle,cellSweep-1.6f,false,paint)
-                    // Each cell has a thin lit bevel and a dark trailing recess.
-                    paint.strokeWidth=dp*.55f
-                    paint.color=if(lit) Design.alpha(Design.mix(color,Design.ink,.55f),strength/2) else Design.alpha(Design.line,75)
-                    val bevel=rr+1.6f*dp
-                    c.drawArc(cx-bevel,cy-bevel,cx+bevel,cy+bevel,angle,cellSweep-1.6f,false,paint)
                 }
             }
             // Permanent color key at the rim, independent of the current brightness.
@@ -267,22 +307,6 @@ class LampWheel(context: Context) : View(context) {
                 c.drawArc(cx-fillTo,cy-fillTo,cx+fillTo,cy+fillTo,start,sweep,false,paint)
             }
             val mid=(start+sweep/2)*PI/180
-            // Compact readouts use actual bridge brightness; hide when sectors become too narrow.
-            if(count<=8 && r>90*dp) {
-                val badgeR=inner+(r-inner)*.61f
-                val bx=cx+cos(mid).toFloat()*badgeR; val by=cy+sin(mid).toFloat()*badgeR
-                paint.typeface=monoFont; paint.textSize=10*resources.displayMetrics.scaledDensity
-                paint.textAlign=Paint.Align.CENTER
-                val value=if(!lamp.reachable) "N/A" else if(bright==0) "OFF" else "${(bright/254f*100).roundToInt()}%"
-                val half=paint.measureText(value)/2+5*dp
-                readoutBounds.set(bx-half,by-9*dp,bx+half,by+7*dp)
-                paint.style=Paint.Style.FILL; paint.color=0xee06111e.toInt()
-                c.drawRoundRect(readoutBounds,2*dp,2*dp,paint)
-                paint.style=Paint.Style.STROKE; paint.strokeWidth=dp*.5f; paint.color=Design.alpha(color,85)
-                c.drawRoundRect(readoutBounds,2*dp,2*dp,paint)
-                paint.style=Paint.Style.FILL; paint.color=if(bright==0) Design.muted else Design.mix(color,Design.ink,.5f)
-                c.drawText(value,bx,by+paint.textSize*.32f,paint)
-            }
             paint.style=Paint.Style.FILL; paint.textAlign=Paint.Align.CENTER
             paint.textSize=9*resources.displayMetrics.scaledDensity; paint.typeface=labelFont
             paint.color=if(!lamp.reachable || bright==0) Design.muted else Design.mix(color,Design.ink,.45f)
@@ -293,105 +317,155 @@ class LampWheel(context: Context) : View(context) {
             c.drawText(label,tx.coerceIn(min(half,width/2f),max(width-half,width/2f)),
                 ty.coerceIn(min(paint.textSize,height/2f),max(height-2*dp,height/2f)),paint)
         }
-        // Machined power core: glass centre, counter-rotating arcs and a breathing neon glyph.
+        // Matte ceramic core: a recessed face, precision ticks and an open annular track.
         val hr=inner-5*dp
         if(hr<=0) return
-        paint.color=Color.WHITE; paint.style=Paint.Style.FILL; paint.shader=hub; c.drawCircle(cx,cy,hr,paint); paint.shader=null
+        paint.shader=null; paint.style=Paint.Style.FILL; paint.color=0xff08131e.toInt()
+        c.drawCircle(cx,cy,hr,paint)
         paint.style=Paint.Style.STROKE; paint.strokeWidth=dp
-        paint.color=Design.alpha(Design.teal,if(ready) 100 else 35); c.drawCircle(cx,cy,hr,paint)
-        paint.color=Design.alpha(Design.violet,95); c.drawCircle(cx,cy,hr-4*dp,paint)
-        paint.color=Design.alpha(Design.teal,22); paint.strokeWidth=dp*.5f
-        for(i in -2..2) {
-            val y=cy+i*hr*.22f
-            val half=sqrt((hr*.68f).pow(2)-(i*hr*.22f).pow(2))
-            c.drawLine(cx-half,y,cx+half,y,paint)
-        }
-        val ring=hr-7*dp
-        if(ring>0) for(i in 0 until 40) {
-            paint.strokeWidth=dp*2; paint.color=Design.alpha(if(i%10<3) Design.teal else Design.line,if(ready) 160 else 65)
-            c.drawArc(cx-ring,cy-ring,cx+ring,cy+ring,i*9f,4f,false,paint)
-        }
-        if(hr>30*dp) {
-            paint.style=Paint.Style.FILL; paint.typeface=monoFont; paint.textAlign=Paint.Align.CENTER
-            paint.textSize=6.5f*resources.displayMetrics.scaledDensity; paint.color=Design.muted
-            c.drawText("ALL LIGHTS",cx,cy+hr*.56f,paint)
-            paint.color=Design.alpha(Design.teal,if(ready) 220 else 90)
-            c.drawText(if(ready) "POWER" else "OFFLINE",cx,cy-hr*.51f,paint)
+        paint.color=Design.alpha(Design.teal,if(ready) 85 else 28)
+        c.drawCircle(cx,cy,hr,paint)
+        paint.color=Design.alpha(Design.line,140); paint.strokeWidth=dp*.6f
+        c.drawCircle(cx,cy,hr*.62f,paint)
+        for(i in 0 until 60) {
+            val a=i*PI/30
+            val r1=hr*(if(i%5==0) .88f else .91f); val r2=hr*.95f
+            paint.color=Design.alpha(if(i%5==0) Design.teal else Design.line,if(ready) 120 else 45)
+            c.drawLine(cx+cos(a).toFloat()*r1,cy+sin(a).toFloat()*r1,
+                cx+cos(a).toFloat()*r2,cy+sin(a).toFloat()*r2,paint)
         }
     }
 
     private fun drawMotion(c: Canvas) {
         val r=outer
-        val hr=inner-5*resources.displayMetrics.density
-        if(hr<=0) return
         val dp=resources.displayMetrics.density
+        val hr=inner-5*dp
+        if(hr<=0) return
+        val moving=orbit!=null
+        val list=shown()
+        val powered=ready && list.any { it.on }
+        val coreColor=if(!ready) Design.muted else if(powered) Design.teal else Design.violet
         paint.shader=null; paint.style=Paint.Style.STROKE; paint.strokeCap=Paint.Cap.BUTT
         val orbitR=r+4*dp
         for(i in 0..2) {
-            paint.color=Design.alpha(if(i==1) Design.violet else Design.teal,100)
+            paint.color=Design.alpha(if(i==1) Design.violet else Design.teal,if(ready) 95 else 25)
             paint.strokeWidth=dp
             val start=phase*360+i*120
             c.drawArc(cx-orbitR,cy-orbitR,cx+orbitR,cy+orbitR,start,28f,false,paint)
-            paint.strokeWidth=dp*2; paint.color=Design.alpha(if(i==1) Design.violet else Design.teal,225)
-            c.drawArc(cx-orbitR,cy-orbitR,cx+orbitR,cy+orbitR,start+26,2f,false,paint)
         }
-        // Photons run through the radial separator channels. The shared animator still
-        // stops on focus loss and honors reduced motion; no additional timer is needed.
-        if(ready && lamps.isNotEmpty()) for(i in lamps.indices) {
-            val a=(-90f+i*360f/lamps.size)*PI/180
-            val t=(phase*3+i*.173f)%1f
-            val rr=inner+(r-inner)*t
-            val tail=(rr-9*dp).coerceAtLeast(inner)
-            val fade=(sin(t*PI)*160).toInt()
-            paint.strokeWidth=dp; paint.color=Design.alpha(Design.teal,fade)
-            c.drawLine(cx+cos(a).toFloat()*tail,cy+sin(a).toFloat()*tail,
-                cx+cos(a).toFloat()*rr,cy+sin(a).toFloat()*rr,paint)
-            paint.style=Paint.Style.FILL
-            for(layer in 2 downTo 0) {
-                paint.color=Design.alpha(Design.teal,if(layer==0) fade else fade/8)
-                c.drawCircle(cx+cos(a).toFloat()*rr,cy+sin(a).toFloat()*rr,(.8f+layer*1.2f)*dp,paint)
+        // Only lamps at full output get a quiet traveling highlight and breathing rim.
+        if(ready && list.isNotEmpty()) for((i,lamp) in list.withIndex()) {
+            val brightness=when {
+                selected==i && dragged -> preview
+                holdIndex==i -> holdBrightness
+                lamp.on -> lamp.brightness
+                else -> 0
             }
-            paint.style=Paint.Style.STROKE
+            if(!lamp.reachable || brightness<254) continue
+            val step=360f/list.size; val gap=min(5f,step*.15f)
+            val start=-90+i*step+gap/2; val sweep=step-gap
+            val cycle=if(moving) (phase*4+i*.13f)%1f else .5f
+            val breath=if(moving) (.5f+.5f*sin(cycle*PI*2)).toFloat() else .5f
+            paint.color=Design.alpha(lamp.color,(18+breath*24).toInt()); paint.strokeWidth=dp*5
+            c.drawArc(cx-r+dp*4,cy-r+dp*4,cx+r-dp*4,cy+r-dp*4,start,sweep,false,paint)
+            val length=min(9f,sweep*.18f)
+            paint.color=Design.alpha(Design.mix(lamp.color,Design.ink,.45f),(sin(cycle*PI)*115).toInt())
+            paint.strokeWidth=dp*1.2f
+            c.drawArc(cx-r+dp*4,cy-r+dp*4,cx+r-dp*4,cy+r-dp*4,start+cycle*(sweep-length),length,false,paint)
         }
+        if(powerTransition) drawPowerWave(c)
+        // An illuminated iris surrounds the glyph: broad apertures, fine opposing tracks,
+        // and a spectrum collar. All surfaces stay matte; light comes from the seams.
+        val charge=powerRequest!=null && moving
+        val rotation=phase*(if(charge) 2160 else 360)
+        val breath=if(moving) .82f+.18f*sin(phase*PI*4).toFloat() else 1f
+        paint.style=Paint.Style.FILL; paint.shader=coreHalo
+        paint.color=Color.WHITE; paint.alpha=if(ready) (215*breath).toInt() else 30
+        c.drawCircle(cx,cy,hr,paint); paint.shader=null
+        c.save(); c.rotate(rotation*.5f,cx,cy)
+        for(i in 0 until 8) {
+            val angle=i*45f
+            iris.reset()
+            for(j in 0..3) {
+                val radius=hr*(if(j==0 || j==3) .53f else .82f)
+                val a=(angle+when(j) { 1 -> 22f; 2 -> 49f; 3 -> 27f; else -> 0f })*PI/180
+                val x=cx+cos(a).toFloat()*radius
+                val y=cy+sin(a).toFloat()*radius
+                if(j==0) iris.moveTo(x,y) else iris.lineTo(x,y)
+            }
+            iris.close()
+            val color=if(i%2==0) coreColor else Design.violet
+            paint.style=Paint.Style.FILL; paint.color=Design.alpha(color,if(ready) 24 else 6)
+            c.drawPath(iris,paint)
+            paint.style=Paint.Style.STROKE; paint.strokeWidth=dp*.65f
+            paint.color=Design.alpha(color,if(ready) 120 else 25); c.drawPath(iris,paint)
+        }
+        c.restore()
+        paint.style=Paint.Style.STROKE
+        c.save(); c.rotate(-rotation,cx,cy)
+        paint.shader=coreSpectrum; paint.color=Color.WHITE
+        for(i in 0 until 8) {
+            val rr=hr*.84f
+            for(layer in 1 downTo 0) {
+                paint.strokeWidth=dp*(if(layer==0) 2.2f else 6f)
+                paint.alpha=if(ready) (if(layer==0) 235 else 24) else (if(layer==0) 45 else 5)
+                c.drawArc(cx-rr,cy-rr,cx+rr,cy+rr,i*45f,32f,false,paint)
+            }
+        }
+        paint.shader=null; c.restore()
+        val rr=hr*.54f
         for(i in 0..2) {
-            paint.color=Design.alpha(if(i==1) Design.violet else Design.teal,if(ready) 210 else 65)
-            paint.strokeWidth=dp*1.5f
-            c.drawArc(cx-hr,cy-hr,cx+hr,cy+hr,-phase*360+i*120,40f,false,paint)
-        }
-        // Counter-tilted orbital ellipses wrap a softly illuminated lens core.
-        paint.style=Paint.Style.FILL; paint.color=Color.WHITE; paint.shader=coreGlow
-        paint.alpha=if(ready) 210 else 65; c.drawCircle(cx,cy,inner*.66f,paint); paint.shader=null
-        for(i in 0..1) {
-            c.save(); c.rotate(if(i==0) -28f else 28f,cx,cy)
-            lensOrbit.set(cx-hr*.7f,cy-hr*.2f,cx+hr*.7f,cy+hr*.2f)
+            paint.strokeWidth=dp; paint.color=Design.alpha(coreColor,if(ready) 210 else 40)
+            c.drawArc(cx-rr,cy-rr,cx+rr,cy+rr,rotation*2f+i*120,75f,false,paint)
+            val a=(rotation*2f+i*120)*PI/180
+            paint.style=Paint.Style.FILL; paint.color=Design.alpha(Design.ink,if(ready) 235 else 55)
+            c.drawCircle(cx+cos(a).toFloat()*rr,cy+sin(a).toFloat()*rr,dp*1.2f,paint)
             paint.style=Paint.Style.STROKE
-            for(layer in 2 downTo 0) {
-                paint.strokeWidth=(.7f+layer*2)*dp
-                paint.color=Design.alpha(if(i==0) Design.teal else Design.violet,if(layer==0) (if(ready) 160 else 40) else 12)
-                c.drawOval(lensOrbit,paint)
-            }
-            val a=(phase*360*(if(i==0) 1 else -1)+i*180)*PI/180
-            paint.style=Paint.Style.FILL; paint.color=Design.alpha(Design.ink,if(ready) 220 else 60)
-            c.drawCircle(cx+cos(a).toFloat()*hr*.7f,cy+sin(a).toFloat()*hr*.2f,dp*1.3f,paint)
-            c.restore()
         }
-        paint.style=Paint.Style.FILL; paint.color=0xff081b29.toInt(); c.drawCircle(cx,cy,hr*.39f,paint)
-        paint.style=Paint.Style.STROKE; paint.color=Design.alpha(Design.teal,55); paint.strokeWidth=dp*.6f
-        c.drawCircle(cx,cy,hr*.39f,paint)
-        val pr=inner*.23f
-        val powerColor=if(ready) Design.teal else Design.muted
-        val pulse=if(orbit==null) 1f else .7f+.3f*sin(phase*PI*6).toFloat()
+        // A quiet dark center keeps the luminous power mark legible at small sizes.
+        paint.style=Paint.Style.FILL; paint.color=0xff07131f.toInt()
+        c.drawCircle(cx,cy,hr*.46f,paint)
+        paint.style=Paint.Style.STROKE; paint.strokeWidth=dp*.7f
+        paint.color=Design.alpha(coreColor,if(ready) 90 else 30)
+        c.drawCircle(cx,cy,hr*.46f,paint)
+        val pr=hr*.32f
         paint.strokeCap=Paint.Cap.ROUND
-        for(layer in 3 downTo 0) {
-            paint.strokeWidth=(2.3f+layer*3)*dp
-            paint.color=Design.alpha(powerColor,if(layer==0) 255 else (14*pulse).toInt())
+        for(layer in 2 downTo 0) {
+            paint.strokeWidth=dp*(if(layer==0) 2.7f else 3f+layer*3)
+            paint.color=Design.alpha(coreColor,if(layer==0) (if(ready) 255 else 105) else (if(powered) (22*breath/layer).toInt() else 7))
             c.drawArc(cx-pr,cy-pr,cx+pr,cy+pr,-48f,276f,false,paint)
-            c.drawLine(cx,cy-pr*1.17f,cx,cy,paint)
+            c.drawLine(cx,cy-pr*1.2f,cx,cy-pr*.05f,paint)
         }
         if(powerDown && isPressed) {
-            paint.color=Design.alpha(Design.teal,45); paint.style=Paint.Style.FILL; c.drawCircle(cx,cy,hr,paint)
+            paint.color=Design.alpha(coreColor,28); paint.style=Paint.Style.FILL; c.drawCircle(cx,cy,hr,paint)
         }
         paint.strokeCap=Paint.Cap.BUTT
+    }
+
+    /** Three shock fronts expand on ignition and collapse on quench, with radial sparks. */
+    private fun drawPowerWave(c: Canvas) {
+        val dp=resources.displayMetrics.density
+        val t=transitionProgress
+        paint.style=Paint.Style.STROKE; paint.strokeCap=Paint.Cap.BUTT
+        for(front in 0..2) {
+            val local=((t-front*.09f)/.82f).coerceIn(0f,1f)
+            if(local<=0f || local>=1f) continue
+            val travel=if(poweringUp) local else 1f-local
+            val rr=inner*.72f+(outer-inner*.72f)*travel
+            val fade=sin(local*PI).toFloat()*(1f-front*.23f)
+            for(layer in 1 downTo 0) {
+                paint.strokeWidth=dp*(if(layer==0) 1.2f else 7f)
+                paint.color=Design.alpha(if(front==1) Design.violet else Design.teal,((if(layer==0) 185 else 20)*fade).toInt())
+                c.drawCircle(cx,cy,rr,paint)
+            }
+            for(i in 0 until 24) {
+                val a=(i*15f+(if(poweringUp) t else -t)*22)*PI/180
+                val tail=(rr-(if(poweringUp) 1 else -1)*dp*12*fade).coerceIn(inner*.6f,outer)
+                paint.strokeWidth=dp; paint.color=Design.alpha(Design.ink,(125*fade).toInt())
+                c.drawLine(cx+cos(a).toFloat()*tail,cy+sin(a).toFloat()*tail,
+                    cx+cos(a).toFloat()*rr,cy+sin(a).toFloat()*rr,paint)
+            }
+        }
     }
     override fun performClick(): Boolean {
         super.performClick()

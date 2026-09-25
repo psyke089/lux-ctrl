@@ -47,3 +47,22 @@ API 24 and API 37 runtime behavior has not been tested on devices or emulators. 
 - Verified the final artwork in portrait, landscape and a temporary 960 × 1706 portrait viewport; all twelve scene buttons remained fully visible (118 px tall in the compact viewport). The picker opens without changing lamp state.
 - Reduced-motion check: with Android's animator scale set to zero and the app relaunched, two separated captures of the app content were pixel-identical. Normal animation was restored afterward. API 24/API 37 runtime remains untested; this pass used the OnePlus 5T / API 33.
 - The optimized APK is installed, and screenshots are refreshed from the running app. Original display size, automatic rotation and animator scale were restored. No lamp or scene writes were used during these UI checks.
+
+## Instrument console refinement — 25 September 2026
+
+- Removed section headings/counts, sector brightness badges, the gesture hint and power-core labels. Neutral spacers retain the original control positions. No new visible text was added.
+- Main-screen buttons use matte fills; dialog surfaces and the color disc retain their existing styling. Scene previews now use palette-colored interference curves, spectral bars and reticles. The power core has a larger glyph, etched ticks and moving broken-ring traces.
+- The center button charges while its bridge request runs, then animates confirmed lamp output with a 1.35-second staggered radial ignition/quench and three expanding/collapsing wave fronts. The first successful connection uses the ignition sequence. Offline/error state clears the pending effect. Off lamps' retained Hue brightness is normalized to zero during interpolation.
+- Reachable lamps at full brightness have a faint breathing rim and traveling highlight. Decorative motion shares the existing lifecycle-aware frame loop, and all transitions honor the system animation setting.
+- Debug and optimized release builds pass, all 13 unit tests pass (including on/off interpolation with retained bridge brightness), and Android lint reports `No issues found`.
+- Verified on the USB-connected OnePlus 5T / Android 13: recorded and inspected startup, global off and global on; checked portrait, landscape and a temporary 960 × 1706 compact screen. All twelve scene tiles fit. Two captures taken two seconds apart with animator scale zero have pixel-identical app content.
+- Exact original lamp power, brightness, color and effect states were restored and verified after global-power testing. Original display size, rotation and animator scale were restored. The optimized APK is installed on the phone. API 24/API 37 runtime behavior was not retested.
+
+## Spectrum cartridges and action line — 25 September 2026
+
+- Reduced the former heading/footer spacers between the dial and scene grid, reserving a fixed 32 dp bottom line for action feedback. Replaced all Toast calls with this line: a confirmation/warning icon, accent edge, subtle tinted surface, diminishing lifetime rail and final fade. Messages replace the previous action, expire after 4.2 seconds and preserve their expiry across in-place rotation. The line has a polite accessibility live region.
+- Aligned the bridge and scene indicators using equal-height rows, matching icon slots and shared text insets. Connection and scene state now use distinct circular/diamond marks and teal/violet accents.
+- Scene previews return to broad spectrum cartridges: actual scene colors fill the preview area, with uniform fine vertical markings and a steady horizontal light rail. Removed the interference curves and reticles.
+- The power core adds an eight-blade illuminated iris, a rotating spectrum collar, opposing inner tracks, soft seam illumination and a brighter central power glyph. Animation remains lifecycle-aware and respects reduced motion; the periodic rotations wrap continuously.
+- Debug/release builds, all 13 unit tests and Android lint pass. Tested on the USB-connected OnePlus 5T / Android 13: power off/on receipts, message replacement/expiry, scene activation, active-scene alignment, rotation during a receipt, landscape and 960 × 1706 compact portrait. All twelve cards fit. Two reduced-motion captures of the app are pixel-identical.
+- Restored and verified the original lamp states after power/scene tests; restored physical resolution, automatic rotation and animator scale. Installed the final optimized APK. Updated screenshots show the test scene and its action receipt. Dialogs and the color disc were not changed in this pass.

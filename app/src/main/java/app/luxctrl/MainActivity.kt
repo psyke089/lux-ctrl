@@ -28,8 +28,10 @@ class MainActivity : Activity() {
     private lateinit var wheel: LampWheel
     private lateinit var status: TextView
     private lateinit var sceneTag: TextView
-    private lateinit var lampCount: TextView
-    private lateinit var sceneCount: TextView
+    private lateinit var actionNotice: ActionNotice
+    private var lastNotice=""
+    private var noticeDeadline=0L
+    private var noticeWarning=false
     private lateinit var errorText: TextView
     private lateinit var sceneList: LinearLayout
     private lateinit var sceneViewport: ScrollView
@@ -62,7 +64,7 @@ class MainActivity : Activity() {
         session = (lastNonConfigurationInstance as? BridgeSession) ?: BridgeSession(conf)
         session.listener = { render() }
         buildContent()
-        if (conf == null) status.text="●  SET UP YOUR BRIDGE"
+
     }
     override fun onRetainNonConfigurationInstance(): Any = session
     override fun onResume() {
@@ -122,10 +124,9 @@ class MainActivity : Activity() {
             paint.shader=LinearGradient(0f,0f,paint.measureText("LUX//CTRL"),0f,
                 intArrayOf(Design.ink,Design.teal,Design.violet),null,Shader.TileMode.CLAMP)
         })
-        brand.addView(space(1)); status=text("●  CONNECTING",9f,Design.teal,true); brand.addView(status)
-        brand.addView(space(1))
-        sceneTag=text("",9f,Design.muted,true).apply { maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END }
-        brand.addView(sceneTag)
+        brand.addView(space(2))
+        status=headerIndicator(); brand.addView(status,LinearLayout.LayoutParams(-1,dp(14)))
+        sceneTag=headerIndicator(); brand.addView(sceneTag,LinearLayout.LayoutParams(-1,dp(14)))
         header.addView(brand,LinearLayout.LayoutParams(0,-2,1f))
         val refresh=GlyphView(this,"refresh").apply { contentDescription="Refresh lights and scenes"; setOnClickListener { if(hasNetworkPermission()) session.refresh(true) else requestLocalNetwork() } }
         header.addView(refresh,LinearLayout.LayoutParams(dp(48),dp(48)).apply { marginEnd=dp(8) })
@@ -151,55 +152,59 @@ class MainActivity : Activity() {
             body.addView(scenes,LinearLayout.LayoutParams(0, -1, .47f))
             body.addView(lamps,LinearLayout.LayoutParams(0,-1,.53f))
         } else {
-            val lampLayout=LinearLayout.LayoutParams(-1,0,.585f)
-            val sceneLayout=LinearLayout.LayoutParams(-1,0,.415f)
+            val lampLayout=LinearLayout.LayoutParams(-1,0,.57f)
+            val sceneLayout=LinearLayout.LayoutParams(-1,0,.43f)
             body.addView(lamps,lampLayout)
             body.addView(scenes,sceneLayout)
-            // Reserve four touch-sized scene rows plus their heading on shorter phones.
+            // Reserve four touch-sized scene rows on shorter phones.
             body.addOnLayoutChangeListener { _,_,top,_,bottom,_,_,_,_ ->
-                val share=(dp(228).toFloat()/(bottom-top).coerceAtLeast(1)).coerceIn(.415f,.6f)
+                val share=(dp(204).toFloat()/(bottom-top).coerceAtLeast(1)).coerceIn(.43f,.6f)
                 if(kotlin.math.abs(sceneLayout.weight-share)>.005f) {
                     sceneLayout.weight=share; lampLayout.weight=1f-share
                     body.post { lamps.requestLayout(); scenes.requestLayout() }
                 }
             }
         }
-        root.addView(body,LinearLayout.LayoutParams(-1,0,1f)); setContentView(root); root.requestApplyInsets(); render()
+        root.addView(body,LinearLayout.LayoutParams(-1,0,1f))
+        actionNotice=ActionNotice(this)
+        root.addView(actionNotice,LinearLayout.LayoutParams(-1,dp(32)).apply {
+            marginStart=dp(22); marginEnd=dp(22); bottomMargin=dp(4)
+        })
+        actionNotice.showMessage(lastNotice,noticeDeadline,noticeWarning)
+        setContentView(root); root.requestApplyInsets(); render()
     }
-    private fun sectionHeading(number: String, title: String, readout: TextView): View = row().apply {
-        setPadding(0,dp(6),0,dp(6))
-        background=SectionRail(this@MainActivity)
-        addView(text(number,9f,Design.amber,true),LinearLayout.LayoutParams(dp(23),-2))
-        addView(text(title,10f,Design.ink,true),LinearLayout.LayoutParams(0,-2,1f))
-        addView(readout)
+    private fun headerIndicator()=text("",8.5f,Design.muted,true).apply {
+        maxLines=1; ellipsize=android.text.TextUtils.TruncateAt.END; gravity=Gravity.CENTER_VERTICAL
+        letterSpacing=.04f; compoundDrawablePadding=dp(5)
+    }
+    private fun styleIndicator(label: TextView, color: Int, scene: Boolean) {
+        label.setTextColor(color)
+        label.setCompoundDrawables(IndicatorMark(this,scene,color),null,null,null)
     }
     private fun lampPanel(): LinearLayout {
         val box=column().apply { setPadding(dp(18),dp(6),dp(18),dp(2)) }
-        lampCount=text("",8f,Design.teal,true)
-        box.addView(sectionHeading("01", "LIGHT FIELD", lampCount))
+        box.addView(space(6))
         wheel=LampWheel(this).apply {
             onPower = {
                 val turnOn=session.state.lamps.none { it.on }
+                wheel.preparePowerTransition(turnOn)
                 session.change(if(turnOn) "All lights on" else "All lights off",edit=true) { api -> api.power(turnOn); null }
             }
             onLamp={ lamp -> lampDialog(lamp) }
             onBrightness={ lamp,bri -> setBrightness(lamp,bri) }
         }
         box.addView(wheel,LinearLayout.LayoutParams(-1,0,1f))
-        box.addView(text("DRAG TO DIM  /  TAP TO TUNE",8f,Design.muted,true).apply {
-            gravity=Gravity.CENTER; setPadding(0,dp(2),0,dp(7))
-        })
+        box.addView(space(2))
         return box
     }
     private fun scenesPanel(): LinearLayout {
         val box=column().apply { setPadding(dp(22),dp(0),dp(22),dp(4)) }
-        sceneCount=text("",8f,Design.teal,true)
-        box.addView(sectionHeading("02", "SCENE ARRAY", sceneCount))
+        box.addView(space(2))
         sceneList=column()
         sceneViewport=ScrollView(this).apply {
             isFillViewport=true; clipToPadding=false; addView(sceneList); isVerticalScrollBarEnabled=false
             // Cache only the visible scene viewport, so idle reactor frames do not resubmit
-            // every planetary shader and path. Android refreshes it on scrolling/state changes.
+            // every signal trace and path. Android refreshes it on scrolling/state changes.
             setLayerType(View.LAYER_TYPE_HARDWARE,null)
             addOnLayoutChangeListener { _,_,_,_,_,_,_,_,_ -> fitSceneRows() }
         }
@@ -224,16 +229,14 @@ class MainActivity : Activity() {
     private fun render() {
         if (!::wheel.isInitialized || isDestroyed) return
         val state=session.state
-        lampCount.text="${state.lamps.count { it.on && it.reachable }.toString().padStart(2,'0')} / ${state.lamps.size.toString().padStart(2,'0')} ON"
-        sceneCount.text="${state.scenes.size.toString().padStart(2,'0')} STORED"
         status.text=when {
-            session.config==null -> "●  SET UP YOUR BRIDGE"
-            !hasNetworkPermission() -> "●  LOCAL ACCESS NEEDED"
-            !session.online && session.busy -> "●  CONNECTING TO BRIDGE"
-            !session.online -> "●  BRIDGE DISCONNECTED"
-            else -> "●  LOCAL BRIDGE CONNECTED"
+            session.config==null -> "SET UP YOUR BRIDGE"
+            !hasNetworkPermission() -> "LOCAL ACCESS NEEDED"
+            !session.online && session.busy -> "CONNECTING TO BRIDGE"
+            !session.online -> "BRIDGE DISCONNECTED"
+            else -> "LOCAL BRIDGE CONNECTED"
         }
-        status.setTextColor(if(session.online) Design.teal else Design.muted)
+        styleIndicator(status,if(session.online) Design.teal else Design.muted,false)
         errorText.text=session.error.orEmpty(); errorText.visibility=if(session.error!=null) View.VISIBLE else View.GONE
         wheel.ready=session.online; wheel.interactive=session.online && !session.busy
         val glide=glideNextLamps && !session.busy
@@ -242,10 +245,10 @@ class MainActivity : Activity() {
         val active=state.scenes.find { it.id==session.activeId }
         sceneTag.text=when {
             active==null -> if(state.lamps.isEmpty()) "" else "NO SCENE"
-            session.dirty -> "● ${active.name} · EDITED"
-            else -> "● ${active.name}"
+            session.dirty -> "${active.name} · EDITED"
+            else -> active.name
         }
-        sceneTag.setTextColor(if(active==null) Design.muted else Design.teal)
+        styleIndicator(sceneTag,if(active==null) Design.muted else Design.violet,true)
         saveGlyph.contentDescription=if(active==null) "Name and save the current lights as a new scene" else "Save the current lights to ${active.name}"
         val canSave=session.online && state.lamps.isNotEmpty() && active?.locked!=true
         saveGlyph.isEnabled=canSave
@@ -262,13 +265,13 @@ class MainActivity : Activity() {
             }
             fitSceneRows()
         }
-        session.notice?.let { toast(it); session.notice=null }
+        session.notice?.let { notifyAction(it); session.notice=null }
     }
     private fun sceneCard(scene: Scene): View {
         val selected=session.activeId==scene.id
         val box=column().apply {
             setPadding(dp(9),dp(6),dp(9),dp(6)); gravity=Gravity.CENTER_VERTICAL
-            Design.clickable(this,if(selected) 0xff102b38.toInt() else Design.panel,if(selected) Design.teal else Design.line,12f,scene.colors.firstOrNull() ?: Design.teal)
+            Design.clickable(this,if(selected) 0xff102b38.toInt() else Design.panel,if(selected) Design.teal else Design.line,12f,scene.colors.firstOrNull() ?: Design.teal,matte=true)
             isClickable=true; isFocusable=true
             contentDescription="${scene.name}${if(selected) ", selected" else ""}. Tap to activate; hold to rename or delete."
             setOnClickListener {
@@ -280,7 +283,7 @@ class MainActivity : Activity() {
         }
         val colors=scene.colors.ifEmpty { listOf(Design.muted,Design.line) }
         val rail=View(this).apply {
-            background=SpectrumDrawable(this@MainActivity,colors,scene.id.hashCode())
+            background=SpectrumDrawable(this@MainActivity,colors)
             importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         box.addView(rail,LinearLayout.LayoutParams(-1,0,1f))
@@ -290,7 +293,11 @@ class MainActivity : Activity() {
         })
         return box
     }
-    private fun toast(value: String) { Toast.makeText(this,value,Toast.LENGTH_SHORT).show() }
+    private fun notifyAction(value: String, warning: Boolean=false) {
+        lastNotice=value; noticeWarning=warning
+        noticeDeadline=android.os.SystemClock.uptimeMillis()+4200
+        actionNotice.showMessage(value,noticeDeadline,warning)
+    }
     private fun show(value: AlertDialog) { dialog?.dismiss(); dialog=value; value.show(); value.window?.setBackgroundDrawable(NeonPanel(this,Design.panel,Design.line,20f)) }
     private fun dialogBody()=column().apply { setPadding(dp(24),dp(12),dp(24),dp(12)) }
     private fun settings() {
@@ -343,7 +350,7 @@ class MainActivity : Activity() {
         }
     }
     private fun lampDialog(lamp: Lamp) {
-        if(!lamp.reachable) { toast("${lamp.name} is unreachable. Check its wall switch."); return }
+        if(!lamp.reachable) { notifyAction("${lamp.name} is unreachable. Check its wall switch.",warning=true); return }
         if(!session.online || session.busy) return
         val body=dialogBody()
         var pickerLandscape=resources.configuration.orientation==Configuration.ORIENTATION_LANDSCAPE
@@ -458,7 +465,7 @@ class MainActivity : Activity() {
     private fun saveScene() {
         if(session.busy || !session.online) return
         val active=session.state.scenes.find { it.id==session.activeId }
-        if(active?.locked==true) { toast("This scene is locked by the bridge and cannot be edited."); return }
+        if(active?.locked==true) { notifyAction("This scene is locked by the bridge and cannot be edited.",warning=true); return }
         if(session.state.lamps.isEmpty()) return
         nameDialog(if(active==null) "Save a new scene" else "Save scene",active?.name.orEmpty()) { name ->
             if(active==null) session.change("$name saved",scenes=true) { api -> api.create(name,session.state.lamps.map { it.id }) }
@@ -482,7 +489,7 @@ class MainActivity : Activity() {
     }
     private fun sceneOptions(scene: Scene) {
         if(session.busy) return
-        if(scene.locked) { toast("This scene is locked by the bridge and cannot be edited."); return }
+        if(scene.locked) { notifyAction("This scene is locked by the bridge and cannot be edited.",warning=true); return }
         show(AlertDialog.Builder(this).setTitle(scene.name).setItems(arrayOf("Rename scene","Delete scene")) { _,which ->
             if(which==0) nameDialog("Rename scene",scene.name) { name -> session.change("Scene renamed",scenes=true) { api -> api.rename(scene.id,name); null } }
             else show(AlertDialog.Builder(this).setTitle("Delete ${scene.name}?").setMessage("This removes the scene from your Hue bridge and other Hue apps. Your lights stay as they are.").setNegativeButton("Cancel",null).setPositiveButton("Delete") { _,_ ->

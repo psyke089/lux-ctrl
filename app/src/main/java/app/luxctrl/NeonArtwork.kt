@@ -100,7 +100,7 @@ class ConsoleBackdrop(context: Context) : ConsoleDrawable() {
 }
 
 /** Dark alloy panels with inset glass and small illuminated hardware contacts. */
-class NeonPanel(context: Context, private val fill: Int, private val edge: Int, radius: Float, private val accent: Int = Design.teal) : ConsoleDrawable() {
+class NeonPanel(context: Context, private val fill: Int, private val edge: Int, radius: Float, private val accent: Int = Design.teal, private val matte: Boolean = false) : ConsoleDrawable() {
     private val dp=context.resources.displayMetrics.density
     private val cut=min(radius,9f)*dp
     private val path=Path()
@@ -118,17 +118,20 @@ class NeonPanel(context: Context, private val fill: Int, private val edge: Int, 
         val l=b.left+dp; val t=b.top+dp; val r=b.right-dp; val bottom=b.bottom-dp
         path.reset(); path.moveTo(l+cut,t); path.lineTo(r,t); path.lineTo(r,bottom-cut)
         path.lineTo(r-cut,bottom); path.lineTo(l,bottom); path.lineTo(l,t+cut); path.close()
+        if(matte) return
         glass=LinearGradient(l,t,r,bottom,intArrayOf(Design.mix(fill,accent,.08f),fill,Design.mix(fill,Color.BLACK,.4f)),null,Shader.TileMode.CLAMP)
         aura=RadialGradient(r,t,(b.width()*.8f).coerceAtLeast(1f),intArrayOf(Design.alpha(accent,25),Design.alpha(accent,0)),null,Shader.TileMode.CLAMP)
         border=LinearGradient(l,t,r,bottom,intArrayOf(Design.mix(edge,Design.teal,.3f),Design.alpha(edge,100),Design.mix(edge,Design.violet,.3f)),null,Shader.TileMode.CLAMP)
     }
     override fun draw(c: Canvas) {
-        paint.color=Color.WHITE; paint.style=Paint.Style.FILL; paint.shader=glass; c.drawPath(path,paint)
-        paint.shader=aura; c.drawPath(path,paint)
-        paint.style=Paint.Style.STROKE; paint.strokeWidth=dp; paint.shader=border; c.drawPath(path,paint); paint.shader=null
+        paint.color=if(matte) fill else Color.WHITE; paint.style=Paint.Style.FILL
+        paint.shader=if(matte) null else glass; c.drawPath(path,paint)
+        if(!matte) { paint.shader=aura; c.drawPath(path,paint) }
+        paint.style=Paint.Style.STROKE; paint.strokeWidth=dp
+        paint.shader=if(matte) null else border; paint.color=edge; c.drawPath(path,paint); paint.shader=null
         val active=edge==Design.teal || focused
         if(active) {
-            paint.color=Design.alpha(Design.teal,25); paint.strokeWidth=5*dp; c.drawPath(path,paint)
+            if(!matte) { paint.color=Design.alpha(Design.teal,25); paint.strokeWidth=5*dp; c.drawPath(path,paint) }
             paint.color=Design.teal; paint.strokeWidth=dp; c.drawPath(path,paint)
         }
         val l=bounds.left+dp; val t=bounds.top+dp; val r=bounds.right-dp; val b=bounds.bottom-dp
@@ -136,108 +139,53 @@ class NeonPanel(context: Context, private val fill: Int, private val edge: Int, 
         c.drawLine(l,t+cut+7*dp,l,t+cut,paint); c.drawLine(l,t+cut,l+cut,t,paint)
         paint.color=Design.alpha(if(active) Design.teal else Design.violet,180)
         c.drawLine(r-cut,b,r,b-cut,paint)
-        paint.strokeWidth=dp*.5f; paint.color=0x19d5f9ff
-        c.drawLine(l+cut+4*dp,t+3*dp,r-6*dp,t+3*dp,paint)
+        if(!matte) {
+            paint.strokeWidth=dp*.5f; paint.color=0x19d5f9ff
+            c.drawLine(l+cut+4*dp,t+3*dp,r-6*dp,t+3*dp,paint)
+        }
         paint.color=Design.alpha(if(active) Design.teal else Design.amber,if(active) 230 else 130)
         paint.strokeWidth=dp
         for(i in 0..2) c.drawLine(r-4*dp,t+(12+i*3)*dp,r-2*dp,t+(11+i*3)*dp,paint)
     }
 }
 
-/** Miniature orbital vistas; all light colors come from the scene's stored palette. */
-class SpectrumDrawable(context: Context, colors: List<Int>, private val seed: Int = 0) : ConsoleDrawable() {
+/** Broad backlit spectrum cartridges: calm, ordered bands of the actual scene colors. */
+class SpectrumDrawable(context: Context, colors: List<Int>) : ConsoleDrawable() {
     private val dp=context.resources.displayMetrics.density
     private val palette=colors.ifEmpty { listOf(Design.muted) }
-    private val colors=palette.let { if(it.size==1) it+it else it }.toIntArray()
     private val rect=RectF()
-    private val orbital=RectF()
-    private val contour=Path()
     private var spectrum: Shader?=null
-    private var atmosphere: Shader?=null
-    private var planet: Shader?=null
-    private var px=0f; private var py=0f; private var pr=0f
-    private val variant=(seed.toLong() and 0x7fffffff).toInt()
+    private var shade: Shader?=null
     override fun onBoundsChange(b: Rect) {
         rect.set(b.left.toFloat(),b.top.toFloat(),b.right.toFloat(),b.bottom.toFloat())
-        val w=rect.width().coerceAtLeast(1f); val h=rect.height().coerceAtLeast(1f)
-        spectrum=LinearGradient(rect.left,rect.top,rect.right.coerceAtLeast(rect.left+1),rect.bottom,colors,null,Shader.TileMode.CLAMP)
-        px=rect.left+w*(.23f+(variant%3)*.08f); py=rect.top+h*.46f; pr=h*.35f
-        atmosphere=RadialGradient(px,py,(pr*2.4f).coerceAtLeast(1f),
-            intArrayOf(Design.alpha(colors[0],125),Design.alpha(colors[0],24),Design.alpha(colors[0],0)),null,Shader.TileMode.CLAMP)
-        planet=RadialGradient(px-pr*.45f,py-pr*.65f,(pr*1.9f).coerceAtLeast(1f),
-            intArrayOf(Design.mix(colors[0],Color.WHITE,.5f),Design.mix(colors[0],Design.bg,.2f),Design.bg),
-            floatArrayOf(0f,.38f,1f),Shader.TileMode.CLAMP)
+        if(rect.isEmpty) return
+        val stops=if(palette.size==1) palette+palette else palette
+        spectrum=LinearGradient(rect.left,rect.top,rect.right,rect.top,stops.toIntArray(),null,Shader.TileMode.CLAMP)
+        shade=LinearGradient(rect.left,rect.top,rect.left,rect.bottom,
+            intArrayOf(0x30030a13,0x00030a13,0xa0030a13.toInt()),floatArrayOf(0f,.35f,1f),Shader.TileMode.CLAMP)
     }
     override fun draw(c: Canvas) {
-        if(rect.width()<=0 || rect.height()<=0) return
+        if(rect.isEmpty) return
         c.save(); c.clipRect(rect)
-        paint.color=Color.WHITE; paint.style=Paint.Style.FILL; paint.shader=spectrum; paint.alpha=16; c.drawRect(rect,paint)
-        paint.alpha=255; paint.shader=atmosphere; c.drawRect(rect,paint); paint.shader=null
-        // Fine distant stars make the previews distinct without inventing scene data.
-        for(i in 0..17) {
-            val x=rect.left+((i*67L+variant)%193)/193f*rect.width()
-            val y=rect.top+((i*43L+variant/7)%97)/97f*rect.height()
-            paint.color=Design.alpha(Design.ink,55+i%4*30); c.drawCircle(x,y,dp*(if(i%7==0) .7f else .35f),paint)
+        paint.shader=spectrum; paint.color=Color.WHITE; paint.alpha=215; paint.style=Paint.Style.FILL
+        c.drawRoundRect(rect,2*dp,2*dp,paint)
+        paint.shader=shade; paint.alpha=255; c.drawRoundRect(rect,2*dp,2*dp,paint); paint.shader=null
+        // Uniform micro-louvres give the color field structure without a noisy waveform.
+        paint.style=Paint.Style.STROKE; paint.strokeWidth=dp*.65f; paint.color=0x70040b15
+        val step=rect.width()/36
+        for(i in 1 until 36) {
+            val x=rect.left+i*step
+            c.drawLine(x,rect.top,x,rect.bottom,paint)
         }
-        // A perspective light lattice recedes into the horizon behind the planet.
-        paint.shader=spectrum; paint.style=Paint.Style.STROKE; paint.strokeWidth=dp*.45f
-        for(i in 0..5) {
-            val t=i/5f
-            val y=rect.top+rect.height()*(.55f+t*t*.45f)
-            paint.alpha=35+i*13; c.drawLine(rect.left,y,rect.right,y,paint)
-        }
-        for(i in -3..9) {
-            paint.alpha=60
-            c.drawLine(rect.left+rect.width()*.62f,rect.top+rect.height()*.5f,rect.left+i*rect.width()/6,rect.bottom,paint)
-        }
-        // Colored horizon ribbons and bloom, cached by the Android drawable display list.
-        contour.reset()
-        for(i in 0..48) {
-            val t=i/48f
-            val x=rect.left+t*rect.width()
-            val y=rect.top+rect.height()*(.57f+.12f*sin(t*PI*2+variant%5).toFloat())
-            if(i==0) contour.moveTo(x,y) else contour.lineTo(x,y)
-        }
-        for(layer in 3 downTo 0) {
-            paint.strokeWidth=(.7f+layer*2.5f)*dp; paint.alpha=if(layer==0) 230 else 16
-            c.drawPath(contour,paint)
-        }
-        paint.alpha=255; paint.shader=planet; paint.style=Paint.Style.FILL; c.drawCircle(px,py,pr,paint); paint.shader=null
-        paint.style=Paint.Style.STROKE; paint.strokeWidth=dp*.65f; paint.color=Design.alpha(Design.ink,190)
-        c.drawArc(px-pr,py-pr,px+pr,py+pr,195f,115f,false,paint)
-        c.save(); c.rotate(-22f-(variant%3)*8,px,py)
-        orbital.set(px-pr*1.7f,py-pr*.36f,px+pr*1.7f,py+pr*.36f)
-        for(layer in 2 downTo 0) {
-            paint.strokeWidth=(.7f+layer*2)*dp
-            paint.color=Design.alpha(colors[colors.lastIndex],if(layer==0) 220 else 22)
-            c.drawArc(orbital,0f,180f,false,paint)
+        paint.color=0x48040b15
+        c.drawLine(rect.left,rect.top+rect.height()*.7f,rect.right,rect.top+rect.height()*.7f,paint)
+        paint.shader=spectrum; paint.alpha=245; paint.strokeWidth=dp
+        c.drawLine(rect.left,rect.top+rect.height()*.7f,rect.right,rect.top+rect.height()*.7f,paint)
+        paint.shader=null; paint.color=Design.alpha(Design.ink,135); paint.strokeWidth=dp*.6f
+        for(i in 0..12) {
+            val x=rect.left+rect.width()*i/12
+            c.drawLine(x,rect.bottom,x,rect.bottom-(if(i%3==0) 3 else 1.5f).toFloat()*dp,paint)
         }
         c.restore()
-        paint.style=Paint.Style.FILL; paint.color=Design.alpha(Design.ink,180)
-        c.drawCircle(px-pr*.4f,py-pr*.72f,dp*.7f,paint)
-        // Short palette samples remain legible even for nearly monochrome scenes.
-        val cell=rect.width()*.25f/colors.size.coerceAtMost(6)
-        for(i in 0 until colors.size.coerceAtMost(6)) {
-            paint.color=colors[i]
-            val x=rect.right-rect.width()*.25f+i*cell
-            c.drawRect(x,rect.top+dp,x+cell-dp,rect.top+2*dp,paint)
-        }
-        paint.color=0x526ba6b4; paint.strokeWidth=dp*.5f
-        c.drawLine(rect.left,rect.bottom-dp,rect.right,rect.bottom-dp,paint)
-        c.restore()
-    }
-}
-
-/** Etched section rails occupy the existing heading bounds. */
-class SectionRail(context: Context) : ConsoleDrawable() {
-    private val dp=context.resources.displayMetrics.density
-    override fun draw(c: Canvas) {
-        val y=bounds.bottom-dp
-        paint.shader=null; paint.style=Paint.Style.STROKE; paint.strokeWidth=dp*.5f
-        paint.color=Design.alpha(Design.teal,40); c.drawLine(bounds.left.toFloat(),y,bounds.right.toFloat(),y,paint)
-        paint.color=Design.amber; paint.strokeWidth=dp*1.5f
-        c.drawLine(bounds.left.toFloat(),y,bounds.left+13*dp,y,paint)
-        paint.color=Design.alpha(Design.teal,170)
-        c.drawLine(bounds.right-26*dp,y,bounds.right-8*dp,y,paint)
     }
 }

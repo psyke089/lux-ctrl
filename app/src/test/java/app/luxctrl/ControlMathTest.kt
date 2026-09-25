@@ -27,6 +27,15 @@ class ControlMathTest {
         assertEquals(0,WheelMath.brightness(200,-1000f,100f))
         assertEquals(130,WheelMath.brightness(130,0f,100f))
     }
+    @Test fun powerAnimationUsesVisibleOutputInsteadOfRetainedHueBrightness() {
+        assertEquals(0,WheelMath.transitionBrightness(false,254,true,254,0f))
+        assertEquals(127,WheelMath.transitionBrightness(false,254,true,254,.5f))
+        assertEquals(254,WheelMath.transitionBrightness(false,254,true,254,1f))
+        assertEquals(127,WheelMath.transitionBrightness(true,254,false,254,.5f))
+        assertEquals(0,WheelMath.transitionBrightness(true,254,false,254,1f))
+        assertEquals(0,WheelMath.transitionBrightness(false,100,false,254,.5f))
+        assertEquals(150,WheelMath.transitionBrightness(true,100,true,200,.5f))
+    }
     @Test fun hsvPrimariesAndUnsaturatedWhite() {
         assertEquals(0xffff0000.toInt(),HueColor.fromHsv(0f,1f))
         assertEquals(0xff00ff00.toInt(),HueColor.fromHsv(120f,1f))

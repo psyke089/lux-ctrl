@@ -26,9 +26,9 @@ object Design {
     fun shape(c: Context, fill: Int = panel, stroke: Int = line, radius: Float = 14f) = GradientDrawable().apply {
         setColor(fill); cornerRadius = dp(c,radius); setStroke(dp(c,1f).toInt(),stroke)
     }
-    fun clickable(v: View, fill: Int = panel, stroke: Int = line, radius: Float = 14f, accent: Int = teal) {
+    fun clickable(v: View, fill: Int = panel, stroke: Int = line, radius: Float = 14f, accent: Int = teal, matte: Boolean = false) {
         v.background = RippleDrawable(ColorStateList.valueOf(alpha(teal,55)),
-            NeonPanel(v.context,fill,stroke,radius,accent),shape(v.context,Color.WHITE,Color.WHITE,radius))
+            NeonPanel(v.context,fill,stroke,radius,accent,matte),shape(v.context,Color.WHITE,Color.WHITE,radius))
     }
     fun label(c: Context, value: String, size: Float = 12f, color: Int = muted, mono: Boolean = false) = TextView(c).apply {
         text = value; textSize = size; setTextColor(color)
@@ -43,7 +43,7 @@ class GlyphView @JvmOverloads constructor(context: Context, private val glyph: S
     init {
         isClickable = true; isFocusable = true
         // Borderless glyphs stay bare at rest and only show a soft ripple when touched.
-        if (bordered) Design.clickable(this,Design.bg,Design.line,14f)
+        if (bordered) Design.clickable(this,Design.bg,Design.line,14f,matte=true)
         else background = RippleDrawable(ColorStateList.valueOf(0x3052e0d1),null,null)
     }
     override fun onDraw(canvas: Canvas) {

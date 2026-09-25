@@ -58,6 +58,13 @@ object HueColor {
 }
 
 object WheelMath {
+    /** Hue retains brightness while off; animation must interpolate the visible output. */
+    fun transitionBrightness(fromOn: Boolean, from: Int, toOn: Boolean, to: Int, progress: Float): Int {
+        val start=if(fromOn) from else 0
+        val end=if(toOn) to else 0
+        return (start+(end-start)*progress.coerceIn(0f,1f)).roundToInt().coerceIn(0,254)
+    }
+
     fun slice(x: Float, y: Float, count: Int): Int {
         if (count == 0) return -1
         val angle = ((atan2(y.toDouble(), x.toDouble()) * 180 / PI + 90 + 360) % 360)
