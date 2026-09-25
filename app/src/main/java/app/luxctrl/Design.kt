@@ -26,9 +26,9 @@ object Design {
     fun shape(c: Context, fill: Int = panel, stroke: Int = line, radius: Float = 14f) = GradientDrawable().apply {
         setColor(fill); cornerRadius = dp(c,radius); setStroke(dp(c,1f).toInt(),stroke)
     }
-    fun clickable(v: View, fill: Int = panel, stroke: Int = line, radius: Float = 14f) {
+    fun clickable(v: View, fill: Int = panel, stroke: Int = line, radius: Float = 14f, accent: Int = teal) {
         v.background = RippleDrawable(ColorStateList.valueOf(alpha(teal,55)),
-            NeonPanel(v.context,fill,stroke,radius),shape(v.context,Color.WHITE,Color.WHITE,radius))
+            NeonPanel(v.context,fill,stroke,radius,accent),shape(v.context,Color.WHITE,Color.WHITE,radius))
     }
     fun label(c: Context, value: String, size: Float = 12f, color: Int = muted, mono: Boolean = false) = TextView(c).apply {
         text = value; textSize = size; setTextColor(color)

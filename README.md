@@ -8,7 +8,7 @@
 </p>
 <p align="center"><img src="docs/screenshot-portrait.png" alt="Lux Ctrl on a phone: six segmented reactor controls above luminous Hue scene tiles" width="300"></p>
 
-A small, dark Android app for Philips Hue, built from [SPEC.md](docs/SPEC.md) with Kotlin and native Android views. No accounts, cloud calls, analytics, ads, or third-party runtime libraries. All icons and graphics are drawn in the project; the badges are rendered by shields.io. The orbital console theme uses a procedural starfield, illuminated alloy panels, scene-colored contour ribbons, segmented reactor cells, live brightness readouts and animated orbital traces, with no downloaded artwork. Decorative motion follows Android’s animation setting and pauses when the app loses focus.
+A small, dark Android app for Philips Hue, built from [SPEC.md](docs/SPEC.md) with Kotlin and native Android views. No accounts, cloud calls, analytics, ads, or third-party runtime libraries. All icons and graphics are drawn in the project; the badges are rendered by shields.io. The orbital console theme uses a procedural starfield, illuminated alloy panels, miniature planets colored by each scene, beveled reactor cells, live brightness readouts and a luminous core with orbiting particles. The color picker has a glass bevel and optical scale. All artwork is drawn locally; the visible scene grid is cached to keep the animated reactor smooth. Decorative motion follows Android’s animation setting and pauses when the app loses focus.
 
 ## Controls
 

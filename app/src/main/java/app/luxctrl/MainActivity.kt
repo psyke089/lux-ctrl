@@ -168,6 +168,7 @@ class MainActivity : Activity() {
     }
     private fun sectionHeading(number: String, title: String, readout: TextView): View = row().apply {
         setPadding(0,dp(6),0,dp(6))
+        background=SectionRail(this@MainActivity)
         addView(text(number,9f,Design.amber,true),LinearLayout.LayoutParams(dp(23),-2))
         addView(text(title,10f,Design.ink,true),LinearLayout.LayoutParams(0,-2,1f))
         addView(readout)
@@ -197,6 +198,9 @@ class MainActivity : Activity() {
         sceneList=column()
         sceneViewport=ScrollView(this).apply {
             isFillViewport=true; clipToPadding=false; addView(sceneList); isVerticalScrollBarEnabled=false
+            // Cache only the visible scene viewport, so idle reactor frames do not resubmit
+            // every planetary shader and path. Android refreshes it on scrolling/state changes.
+            setLayerType(View.LAYER_TYPE_HARDWARE,null)
             addOnLayoutChangeListener { _,_,_,_,_,_,_,_,_ -> fitSceneRows() }
         }
         box.addView(sceneViewport,LinearLayout.LayoutParams(-1,0,1f))
@@ -264,7 +268,7 @@ class MainActivity : Activity() {
         val selected=session.activeId==scene.id
         val box=column().apply {
             setPadding(dp(9),dp(6),dp(9),dp(6)); gravity=Gravity.CENTER_VERTICAL
-            Design.clickable(this,if(selected) 0xff102b38.toInt() else Design.panel,if(selected) Design.teal else Design.line,12f)
+            Design.clickable(this,if(selected) 0xff102b38.toInt() else Design.panel,if(selected) Design.teal else Design.line,12f,scene.colors.firstOrNull() ?: Design.teal)
             isClickable=true; isFocusable=true
             contentDescription="${scene.name}${if(selected) ", selected" else ""}. Tap to activate; hold to rename or delete."
             setOnClickListener {
@@ -276,7 +280,7 @@ class MainActivity : Activity() {
         }
         val colors=scene.colors.ifEmpty { listOf(Design.muted,Design.line) }
         val rail=View(this).apply {
-            background=SpectrumDrawable(this@MainActivity,colors)
+            background=SpectrumDrawable(this@MainActivity,colors,scene.id.hashCode())
             importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
         box.addView(rail,LinearLayout.LayoutParams(-1,0,1f))

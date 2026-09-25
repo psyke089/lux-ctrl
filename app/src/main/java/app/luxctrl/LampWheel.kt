@@ -56,6 +56,9 @@ class LampWheel(context: Context) : View(context) {
     private val arc = RectF()
     private var aura: Shader? = null
     private var hub: Shader? = null
+    private var shell: Shader? = null
+    private var coreGlow: Shader? = null
+    private val lensOrbit=RectF()
     private val sectorShaders = mutableMapOf<Int, Pair<Int, Shader>>()
     private val labelFont = Typeface.create("sans-serif-medium",Typeface.NORMAL)
     private val monoFont = Typeface.create("monospace",Typeface.NORMAL)
@@ -91,13 +94,18 @@ class LampWheel(context: Context) : View(context) {
         dialTexture?.recycle(); dialTexture=null; textureCanvas=null; dialDirty=true
         val r=outer.coerceAtLeast(1f)
         aura=RadialGradient(cx,cy,r*1.12f,intArrayOf(0x00206880,0x00206880,0x20206880,0x00206880),floatArrayOf(0f,.65f,.88f,1f),Shader.TileMode.CLAMP)
-        hub=RadialGradient(cx-inner*.3f,cy-inner*.4f,(inner*1.6f).coerceAtLeast(1f),
-            intArrayOf(0xff173347.toInt(),0xff090e21.toInt(),0xff15132d.toInt()),null,Shader.TileMode.CLAMP)
+        shell=RadialGradient(cx,cy,r*1.02f,
+            intArrayOf(0xff020711.toInt(),0xff081725.toInt(),0xff050b17.toInt(),0xff193348.toInt()),
+            floatArrayOf(0f,.4f,.94f,1f),Shader.TileMode.CLAMP)
+        hub=RadialGradient(cx,cy,inner.coerceAtLeast(1f),
+            intArrayOf(0xff173c4d.toInt(),0xff040a15.toInt(),0xff142d45.toInt()),floatArrayOf(0f,.6f,1f),Shader.TileMode.CLAMP)
+        coreGlow=RadialGradient(cx,cy,(inner*.66f).coerceAtLeast(1f),
+            intArrayOf(0x6033eee9,0x122370a9,0x002370a9),null,Shader.TileMode.CLAMP)
     }
     private fun sectorShader(index: Int,color: Int): Shader {
         val cached=sectorShaders[index]
         if(cached?.first==color) return cached.second
-        return RadialGradient(cx,cy,outer,intArrayOf(Design.alpha(color,0),Design.alpha(color,8),Design.alpha(color,40)),
+        return RadialGradient(cx,cy,outer,intArrayOf(Design.alpha(color,0),Design.alpha(color,12),Design.alpha(color,62)),
             floatArrayOf(0f,.36f,1f),Shader.TileMode.CLAMP).also { sectorShaders[index]=color to it }
     }
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
@@ -164,6 +172,8 @@ class LampWheel(context: Context) : View(context) {
         val r=outer
         val dp=resources.displayMetrics.density
         val list=shown()
+        paint.shader=shell; paint.style=Paint.Style.FILL; paint.color=Color.WHITE
+        c.drawCircle(cx,cy,r+2*dp,paint)
         paint.shader=aura; paint.style=Paint.Style.FILL; paint.alpha=255
         c.drawCircle(cx,cy,r*1.12f,paint); paint.shader=null
         paint.strokeCap=Paint.Cap.BUTT
@@ -184,6 +194,14 @@ class LampWheel(context: Context) : View(context) {
             paint.color=if(tick%10==0) Design.alpha(Design.teal,160) else Design.line
             paint.strokeWidth=dp
             c.drawLine(cx+cos(a).toFloat()*a1,cy+sin(a).toFloat()*a1,cx+cos(a).toFloat()*a2,cy+sin(a).toFloat()*a2,paint)
+        }
+        // Machined collar: dark slots, bright bevels and fine index marks.
+        paint.style=Paint.Style.STROKE; paint.strokeWidth=dp*4; paint.color=0xff07101d.toInt()
+        c.drawCircle(cx,cy,r+3*dp,paint)
+        for(i in 0 until 48) {
+            paint.strokeWidth=dp*(if(i%4==0) 2f else .7f)
+            paint.color=Design.alpha(if(i%12==0) Design.amber else Design.teal,if(i%4==0) 150 else 55)
+            c.drawArc(cx-r-3*dp,cy-r-3*dp,cx+r+3*dp,cy+r+3*dp,i*7.5f,4.5f,false,paint)
         }
         paint.style=Paint.Style.STROKE; paint.color=Design.line; paint.strokeWidth=dp*.6f
         for(i in 0..3) {
@@ -220,11 +238,18 @@ class LampWheel(context: Context) : View(context) {
             val cellSweep=sweep/columns
             for(j in 1..rows) {
                 val rr=inner+(r-inner)*j/rows
-                paint.strokeWidth=dp*(if(j%3==0) 2.2f else 1.4f)
                 for(k in 0 until columns) {
                     val lit=rr<=fillTo
-                    paint.color=if(lit) Design.alpha(color,if(lamp.reachable) 75+j*65/rows else 40) else Design.alpha(Design.line,65)
-                    c.drawArc(cx-rr,cy-rr,cx+rr,cy+rr,start+k*cellSweep,cellSweep-1.4f,false,paint)
+                    val angle=start+k*cellSweep
+                    val strength=if(lamp.reachable) 90+j*85/rows else 40
+                    paint.strokeWidth=dp*3.3f
+                    paint.color=if(lit) Design.alpha(color,strength) else Design.alpha(Design.line,65)
+                    c.drawArc(cx-rr,cy-rr,cx+rr,cy+rr,angle,cellSweep-1.6f,false,paint)
+                    // Each cell has a thin lit bevel and a dark trailing recess.
+                    paint.strokeWidth=dp*.55f
+                    paint.color=if(lit) Design.alpha(Design.mix(color,Design.ink,.55f),strength/2) else Design.alpha(Design.line,75)
+                    val bevel=rr+1.6f*dp
+                    c.drawArc(cx-bevel,cy-bevel,cx+bevel,cy+bevel,angle,cellSweep-1.6f,false,paint)
                 }
             }
             // Permanent color key at the rim, independent of the current brightness.
@@ -275,6 +300,12 @@ class LampWheel(context: Context) : View(context) {
         paint.style=Paint.Style.STROKE; paint.strokeWidth=dp
         paint.color=Design.alpha(Design.teal,if(ready) 100 else 35); c.drawCircle(cx,cy,hr,paint)
         paint.color=Design.alpha(Design.violet,95); c.drawCircle(cx,cy,hr-4*dp,paint)
+        paint.color=Design.alpha(Design.teal,22); paint.strokeWidth=dp*.5f
+        for(i in -2..2) {
+            val y=cy+i*hr*.22f
+            val half=sqrt((hr*.68f).pow(2)-(i*hr*.22f).pow(2))
+            c.drawLine(cx-half,y,cx+half,y,paint)
+        }
         val ring=hr-7*dp
         if(ring>0) for(i in 0 until 40) {
             paint.strokeWidth=dp*2; paint.color=Design.alpha(if(i%10<3) Design.teal else Design.line,if(ready) 160 else 65)
@@ -304,12 +335,50 @@ class LampWheel(context: Context) : View(context) {
             paint.strokeWidth=dp*2; paint.color=Design.alpha(if(i==1) Design.violet else Design.teal,225)
             c.drawArc(cx-orbitR,cy-orbitR,cx+orbitR,cy+orbitR,start+26,2f,false,paint)
         }
+        // Photons run through the radial separator channels. The shared animator still
+        // stops on focus loss and honors reduced motion; no additional timer is needed.
+        if(ready && lamps.isNotEmpty()) for(i in lamps.indices) {
+            val a=(-90f+i*360f/lamps.size)*PI/180
+            val t=(phase*3+i*.173f)%1f
+            val rr=inner+(r-inner)*t
+            val tail=(rr-9*dp).coerceAtLeast(inner)
+            val fade=(sin(t*PI)*160).toInt()
+            paint.strokeWidth=dp; paint.color=Design.alpha(Design.teal,fade)
+            c.drawLine(cx+cos(a).toFloat()*tail,cy+sin(a).toFloat()*tail,
+                cx+cos(a).toFloat()*rr,cy+sin(a).toFloat()*rr,paint)
+            paint.style=Paint.Style.FILL
+            for(layer in 2 downTo 0) {
+                paint.color=Design.alpha(Design.teal,if(layer==0) fade else fade/8)
+                c.drawCircle(cx+cos(a).toFloat()*rr,cy+sin(a).toFloat()*rr,(.8f+layer*1.2f)*dp,paint)
+            }
+            paint.style=Paint.Style.STROKE
+        }
         for(i in 0..2) {
             paint.color=Design.alpha(if(i==1) Design.violet else Design.teal,if(ready) 210 else 65)
             paint.strokeWidth=dp*1.5f
             c.drawArc(cx-hr,cy-hr,cx+hr,cy+hr,-phase*360+i*120,40f,false,paint)
         }
-        val pr=inner*.26f
+        // Counter-tilted orbital ellipses wrap a softly illuminated lens core.
+        paint.style=Paint.Style.FILL; paint.color=Color.WHITE; paint.shader=coreGlow
+        paint.alpha=if(ready) 210 else 65; c.drawCircle(cx,cy,inner*.66f,paint); paint.shader=null
+        for(i in 0..1) {
+            c.save(); c.rotate(if(i==0) -28f else 28f,cx,cy)
+            lensOrbit.set(cx-hr*.7f,cy-hr*.2f,cx+hr*.7f,cy+hr*.2f)
+            paint.style=Paint.Style.STROKE
+            for(layer in 2 downTo 0) {
+                paint.strokeWidth=(.7f+layer*2)*dp
+                paint.color=Design.alpha(if(i==0) Design.teal else Design.violet,if(layer==0) (if(ready) 160 else 40) else 12)
+                c.drawOval(lensOrbit,paint)
+            }
+            val a=(phase*360*(if(i==0) 1 else -1)+i*180)*PI/180
+            paint.style=Paint.Style.FILL; paint.color=Design.alpha(Design.ink,if(ready) 220 else 60)
+            c.drawCircle(cx+cos(a).toFloat()*hr*.7f,cy+sin(a).toFloat()*hr*.2f,dp*1.3f,paint)
+            c.restore()
+        }
+        paint.style=Paint.Style.FILL; paint.color=0xff081b29.toInt(); c.drawCircle(cx,cy,hr*.39f,paint)
+        paint.style=Paint.Style.STROKE; paint.color=Design.alpha(Design.teal,55); paint.strokeWidth=dp*.6f
+        c.drawCircle(cx,cy,hr*.39f,paint)
+        val pr=inner*.23f
         val powerColor=if(ready) Design.teal else Design.muted
         val pulse=if(orbit==null) 1f else .7f+.3f*sin(phase*PI*6).toFloat()
         paint.strokeCap=Paint.Cap.ROUND

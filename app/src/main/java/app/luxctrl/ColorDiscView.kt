@@ -20,6 +20,7 @@ class ColorDiscView(context: Context) : View(context) {
     var brightness = 1f; private set
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private var ringShader: Shader? = null
+    private var ringGlass: Shader? = null
     private var bitmap: Bitmap? = null
     private var tones = FloatArray(0)
     private var pixels = IntArray(0)
@@ -48,6 +49,9 @@ class ColorDiscView(context: Context) : View(context) {
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         ringShader = SweepGradient(cx, cy, IntArray(7) { Color.HSVToColor(floatArrayOf((360-it*60).toFloat(),1f,1f)) }, null)
+        ringGlass=RadialGradient(cx,cy,radius,
+            intArrayOf(0x00000000,0x00000000,0x60304a60,0x00ffffff,0x15ffffff,0x75ffffff),
+            floatArrayOf(0f,.71f,.73f,.83f,.98f,1f),Shader.TileMode.CLAMP)
         // A bounded texture keeps ring dragging smooth even on older phones.
         val size = min(320, (discRadius*2).roundToInt()).coerceAtLeast(2)
         bitmap?.recycle()
@@ -69,6 +73,8 @@ class ColorDiscView(context: Context) : View(context) {
         paint.strokeWidth = radius*.28f
         paint.shader = ringShader
         canvas.drawCircle(cx,cy,radius*.86f,paint)
+        // A narrow glass bevel gives the ring depth while its central color band stays exact.
+        paint.shader=ringGlass; canvas.drawCircle(cx,cy,radius*.86f,paint)
         paint.shader = null
         // Concentric etched scales match the reactor dial without changing its hit regions.
         val dp=resources.displayMetrics.density
@@ -77,6 +83,14 @@ class ColorDiscView(context: Context) : View(context) {
         canvas.drawCircle(cx,cy,radius+3*dp,paint)
         paint.color=Design.alpha(Design.violet,150)
         canvas.drawCircle(cx,cy,discRadius+4*dp,paint)
+        // Optical encoder marks live on the outer lip, away from the hue sampling band.
+        for(tick in 0 until 120) {
+            val a=tick*PI/60
+            val r1=radius*(if(tick%10==0) .95f else .978f)
+            paint.color=Design.alpha(Design.bg,if(tick%10==0) 170 else 105)
+            canvas.drawLine(cx+cos(a).toFloat()*r1,cy+sin(a).toFloat()*r1,
+                cx+cos(a).toFloat()*radius,cy+sin(a).toFloat()*radius,paint)
+        }
         for(tick in 0 until 60) {
             val a=tick*PI/30
             val r1=radius+6*dp; val r2=r1+(if(tick%5==0) 4f else 1.5f)*dp

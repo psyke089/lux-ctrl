@@ -35,3 +35,15 @@ API 24 and API 37 runtime behavior has not been tested on devices or emulators. 
 - Verified on the connected OnePlus 5T / Android 13 in portrait and landscape, including a temporary 960 × 1706 display size. All 12 scene tiles fit; compact portrait reserves enough height for four 44 dp touch rows and the section heading. Small dials omit secondary readouts when space is limited.
 - Verified the color picker opening in portrait and reflowing into side-by-side controls on rotation, without changing its selected color. Screenshots were refreshed from the running app; no lamp or scene write actions were used for this makeover's UI checks.
 - The final optimized APK is installed on the phone. Original physical display size and automatic-rotation settings were restored after verification. API 24/API 37 runtime and reduced-motion behavior were not retested in this pass.
+
+## Warp 11 visual pass — 25 September 2026
+
+- The previous orbital makeover is preserved in commit `50184e6`.
+- Scene previews now depict ringed planets, distant stars, perspective grids and luminous horizons using each scene's actual palette. Stable scene IDs vary their compositions. Panel illumination follows the palette, and etched rails frame the section headings.
+- The dial adds a machined collar, beveled energy cells, radial photon trails and a lens core wrapped by orbiting cyan/violet particles. The backdrop gains curved navigation trajectories, and the picker gains a glass bevel and optical encoder marks. Touch geometry and bridge operations are unchanged.
+- All new animation shares the existing lifecycle-aware, reduced-motion-aware reactor animator. The static dial remains cached. A bounded hardware layer caches the visible scene viewport, with Android invalidating it on content changes and scrolling.
+- The static star chart is rendered once into a texture capped at a 1280 px long edge and regenerated on bounds changes. This avoids resubmitting its many chart paths on every reactor frame. In the final on-device idle sample (831 frames, about 28 seconds), median frame time was 9 ms, 95th percentile 11 ms, and no frames missed their deadline. This is a device-specific sample, not a performance guarantee.
+- Debug/release builds, all 12 existing unit tests and Android lint pass (`No issues found`). No runtime libraries or downloaded assets were added.
+- Verified the final artwork in portrait, landscape and a temporary 960 × 1706 portrait viewport; all twelve scene buttons remained fully visible (118 px tall in the compact viewport). The picker opens without changing lamp state.
+- Reduced-motion check: with Android's animator scale set to zero and the app relaunched, two separated captures of the app content were pixel-identical. Normal animation was restored afterward. API 24/API 37 runtime remains untested; this pass used the OnePlus 5T / API 33.
+- The optimized APK is installed, and screenshots are refreshed from the running app. Original display size, automatic rotation and animator scale were restored. No lamp or scene writes were used during these UI checks.
