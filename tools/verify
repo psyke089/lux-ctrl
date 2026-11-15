@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Local and CI verification gate for Lux Ctrl.
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+exec ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug "$@"
