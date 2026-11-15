@@ -2,9 +2,10 @@
 <h1 align="center">Lux / Ctrl</h1>
 <p align="center">A local instrument for your Hue lights.</p>
 <p align="center">
+  <a href="https://github.com/psyke089/lux-ctrl/actions/workflows/ci.yml"><img src="https://github.com/psyke089/lux-ctrl/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/psyke089/lux-ctrl/releases"><img src="https://img.shields.io/badge/release-v0.3.0-blue?logo=github&logoColor=white" alt="Release v0.3.0"></a>
-  <img src="https://img.shields.io/badge/vibe_coded-100%25-critical?logo=codeberg&logoColor=white" alt="No human review">
-  <img src="https://img.shields.io/badge/human_review-none-green?logo=codeberg&logoColor=white" alt="Human review: none">
+  <img src="https://img.shields.io/badge/vibe_coded-100%25-critical?logo=github&logoColor=white" alt="No human review">
+  <img src="https://img.shields.io/badge/human_review-none-green?logo=github&logoColor=white" alt="Human review: none">
 </p>
 <p align="center"><img src="docs/screenshot-portrait.png" alt="Lux Ctrl on a phone: six segmented reactor controls above luminous Hue scene tiles" width="300"></p>
 
@@ -42,6 +43,6 @@ adb shell am instrument -w -e live true app.luxctrl.test/app.luxctrl.BridgeSmoke
 
 ## Download
 
-Releases: [GitHub](https://github.com/psyke089/lux-ctrl/releases) · [Codeberg](https://codeberg.org/k4r/lux-ctrl/releases).
+Download: [latest release](https://github.com/psyke089/lux-ctrl/releases).
 
 Also see the [color disc](docs/screenshot-color-disc.png), [landscape screenshot](docs/screenshot-landscape.png), [verification notes](docs/verification.md) and [SPEC.md](docs/SPEC.md).
