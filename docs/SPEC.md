@@ -1,7 +1,7 @@
 # Lux Ctrl — specification
 
 Current behavior of the app as shipped in 0.3.0. Supersedes the original build brief and the
-review notes in `REV-1.md` (both folded in here).
+earlier review notes (both folded in here).
 
 ## Scope
 
