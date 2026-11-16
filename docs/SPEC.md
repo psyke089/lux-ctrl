@@ -117,7 +117,7 @@ brightness.
 
 ```sh
 ./tools/verify                    # unit tests, lint, debug APK
-./gradlew :app:assembleRelease    # R8-minified, resource-shrunk, debug-signed
+./gradlew :app:assembleRelease    # R8-minified, resource-shrunk, release-signed
 ```
 
 Release APKs keep the same signing identity across versions so they upgrade in place. Pushing a

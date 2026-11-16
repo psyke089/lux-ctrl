@@ -64,18 +64,25 @@ jobs:
           test "${{ steps.version.outputs.tag }}" = "$GITHUB_REF_NAME" ||
             { echo "::error::tag $GITHUB_REF_NAME does not match versionName ${{ steps.version.outputs.name }}"; exit 1; }
       - name: Restore the release signing key
-        # Every published APK must keep the signing identity of the earlier releases, otherwise an
-        # update fails with INSTALL_FAILED_UPDATE_INCOMPATIBLE.
+        # The dedicated key replaced the old public debug identity; installs from before the
+        # rotation need one reinstall before they can update in place again.
         env:
           KEYSTORE_B64: ${{ secrets.LUXCTRL_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.LUXCTRL_STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.LUXCTRL_KEY_PASSWORD }}
         run: |
-          test -n "$KEYSTORE_B64" ||
-            { echo "::error::secret LUXCTRL_KEYSTORE_B64 is missing"; exit 1; }
-          mkdir -p "$RUNNER_TEMP/android"
-          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/android/debug.keystore"
+          set -euo pipefail
+          for secret in KEYSTORE_B64 STORE_PASSWORD KEY_PASSWORD; do
+            [ -n "${!secret}" ] || { echo "::error::missing signing secret $secret"; exit 1; }
+          done
+          keystore="$RUNNER_TEMP/lux-ctrl-release.jks"
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$keystore"
+          {
+            printf 'LUXCTRL_STORE_FILE=%s\n' "$keystore"
+            printf 'LUXCTRL_STORE_PASSWORD=%s\n' "$STORE_PASSWORD"
+            printf 'LUXCTRL_KEY_PASSWORD=%s\n' "$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
       - name: Build, test and lint
-        env:
-          ANDROID_USER_HOME: ${{ runner.temp }}/android
         run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleRelease
       - name: Assert the APK keeps the release signature
         run: |
@@ -85,7 +92,7 @@ jobs:
           apk=app/build/outputs/apk/release/lux-ctrl-${{ steps.version.outputs.name }}.apk
           test -f "$apk" || { echo "::error::$apk missing"; exit 1; }
           "$apksigner" verify --print-certs "$apk" | tee "$RUNNER_TEMP/certs.txt"
-          grep -qi "certificate SHA-256 digest: cde2781a239ab2b876e06f66b2654196979ba3f1d619dbb660a8d32601df1988" \
+          grep -qi "certificate SHA-256 digest: 0bebaffdeb40c7b7517dd99aaf4670d1ecb3ee63fbb92541e86bc5a540ab6e84" \
             "$RUNNER_TEMP/certs.txt" ||
             { echo "::error::APK is not signed with the Lux Ctrl release key"; exit 1; }
       - name: Assert the APK reports the repository version

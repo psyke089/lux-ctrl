@@ -28,7 +28,7 @@ JDK 17+, Android SDK 37, and the included wrapper.
 
 ```sh
 ./tools/verify                    # unit tests, lint, debug APK
-./gradlew :app:assembleRelease    # R8-minified, debug-signed, no keystore setup
+./gradlew :app:assembleRelease    # R8-minified, signed with the release key
 ```
 
 The release APK lands at `app/build/outputs/apk/release/lux-ctrl-0.3.0.apk`. Minimum Android 7.0 (API 24); Gradle 9.6.0, AGP 9.4.1.
